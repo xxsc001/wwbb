@@ -95,6 +95,27 @@ $('brushMode').onclick=()=>setViewMode('brush');
 $('panMode').onclick=()=>setViewMode('pan');
 $('zoom').oninput=()=>zoomTo(Number($('zoom').value)/100);
 $('resetView').onclick=()=>zoomTo(1);
+$('focusBands').onclick=()=>{
+ if(drawing||view.drag||loading||exporting)return;
+ const match=CropTemplates.estimateBands(canvas,{
+  x:(.5-view.x)/view.zoom,
+  y:(.5-view.y)/view.zoom,
+  width:canvas.width*.8/view.zoom,
+  height:canvas.height*.7/view.zoom,
+  scale:1
+ });
+ if(!match){
+  status('左图未找到明显条带，可用「联动缩放」和「移动视野」手动定位。');
+  return;
+ }
+ const {left,right,top,bottom}=match.bounds;
+ const paddedSpan=Math.max((right-left)*1.28,(bottom-top)*1.4);
+ view.zoom=Math.min(5,Math.max(1,Math.floor(20/paddedSpan)/20));
+ view.x=.5-(left+right)/2*view.zoom;
+ view.y=.5-(top+bottom)/2*view.zoom;
+ renderView();
+ status('已定位左图的候选条带，两张图已同步到相同倍率和相对位置。');
+};
 leftViewport.addEventListener('wheel',event=>{
  if(view.mode!=='pan'||event.ctrlKey||event.metaKey||drawing||view.drag)return;
  event.preventDefault();

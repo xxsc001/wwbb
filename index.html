@@ -11,8 +11,9 @@
     <button id="panMode" type="button" aria-pressed="false">移动视野</button>
   </div>
   <label class="zoom-control" for="zoom"><span>联动缩放 <output id="zoomValue">100%</output></span>
-    <input id="zoom" type="range" min="100" max="500" step="5" value="100">
+    <input id="zoom" type="range" min="100" max="500" step="1" value="100">
   </label>
+  <button id="focusBands" type="button">定位并放大条带</button>
   <button id="resetView" type="button">重置视野</button>
 </div>
 <div class="image-pair"><div class="image-panel"><div class="panel-title"><span><b>左图</b> 操作区域</span><button id="importLeft">＋ 导入左图</button></div><div class="canvas-wrap" id="dropzone"><canvas id="canvas" width="1200" height="780" aria-label="左图操作画布，支持编辑和联动缩放移动"></canvas><div id="cursor" hidden></div><div class="drop-hint">松开以导入左图</div><span class="image-label" id="imageLabel">DEMO / 模拟条带</span></div></div><div class="image-panel"><div class="panel-title"><span><b>右图</b> 同步结果</span><button id="importRight">＋ 导入右图</button></div><div class="canvas-wrap" id="dropzoneRight"><canvas id="canvasRight" width="1200" height="780" aria-label="右图同步结果，只读预览"></canvas><div id="cursorRight" class="sync-cursor" hidden></div><div class="drop-hint">松开以导入右图</div><span class="image-label" id="imageLabelRight">DEMO / 同步预览</span></div><div id="rightInfo" class="right-info">模拟条带-右图.png · 1200 × 780 px</div></div></div>

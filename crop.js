@@ -143,7 +143,10 @@ const CropTemplates = (() => {
       }
       const bandWidth = x1 - x0 + 1, bandHeight = y1 - y0 + 1;
       if (bandWidth >= 5 && bandWidth >= 1.7 * bandHeight && bandWidth < width * .75 && queue.length >= 7) {
-        components.push({x: sx / weight / width, y: sy / weight / height, weight: Math.sqrt(weight)});
+        components.push({
+          x: sx / weight / width, y: sy / weight / height, weight: Math.sqrt(weight),
+          left: x0 / width, right: (x1 + 1) / width, top: y0 / height, bottom: (y1 + 1) / height
+        });
       }
     }
     if (!components.length) return null;
@@ -160,7 +163,13 @@ const CropTemplates = (() => {
     const total = group.reduce((sum, band) => sum + band.score, 0);
     return {
       x: group.reduce((sum, band) => sum + band.x * band.score, 0) / total,
-      y: group.reduce((sum, band) => sum + band.y * band.score, 0) / total
+      y: group.reduce((sum, band) => sum + band.y * band.score, 0) / total,
+      bounds: {
+        left: Math.min(...group.map(band => band.left)),
+        right: Math.max(...group.map(band => band.right)),
+        top: Math.min(...group.map(band => band.top)),
+        bottom: Math.max(...group.map(band => band.bottom))
+      }
     };
   }
 
@@ -168,7 +177,8 @@ const CropTemplates = (() => {
     if (!template?.auto) return null;
     const view = {...template};
     const match = estimateBands(source, view);
-    return {view: constrain(source, {...view, ...match}), found: Boolean(match)};
+    const {x, y} = match || view;
+    return {view: constrain(source, {...view, x, y}), found: Boolean(match)};
   }
 
   const fieldNames = ['cropWidth', 'cropHeight', 'cropRotation', 'cropScale'];
@@ -287,7 +297,7 @@ const CropTemplates = (() => {
     if (!view) return;
     const match = estimateBands(active.source, view);
     if (match) {
-      active.view = {...view, ...match};
+      active.view = {...view, x: match.x, y: match.y};
       get('cropStatus').textContent = '已定位候选条带，请检查取景框，可拖动微调。';
       schedulePreview();
     } else get('cropStatus').textContent = '未检测到明显条带，请在左图手动定位。';
@@ -333,5 +343,5 @@ const CropTemplates = (() => {
   };
 
   refreshTemplateStatus();
-  return {open, autoView, render};
+  return {open, autoView, render, estimateBands};
 })();
