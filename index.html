@@ -70,11 +70,11 @@
 </main>
 <dialog id="cropDialog" aria-labelledby="cropTitle">
   <header class="crop-dialog-heading">
-    <div><h2 id="cropTitle">裁切图片</h2><p>拖动左侧取景框调整位置，右侧查看裁切结果。</p></div>
+    <div><h2 id="cropTitle">裁切图片</h2><p id="cropKeyboardHelp">拖动取景框或用方向键微调。方向键每次移动 1 像素，按住 Shift 移动 10 像素。</p></div>
     <button id="cropCancel" type="button">关闭</button>
   </header>
   <div class="crop-preview">
-    <div><h3>原图与取景范围</h3><canvas id="cropOverview" aria-label="拖动以移动裁切取景框"></canvas></div>
+    <div><h3 id="cropSourceLabel">裁切来源</h3><canvas id="cropOverview" tabindex="0" aria-label="裁切取景框" aria-describedby="cropKeyboardHelp cropPosition"></canvas><p id="cropPosition" class="export-dimensions"></p></div>
     <div><h3>裁切预览</h3><canvas id="cropResult" aria-label="裁切结果预览"></canvas></div>
   </div>
   <div class="crop-fields">
@@ -106,4 +106,4 @@
 </dialog>
 <input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
 <input type="file" id="fileRight" accept="image/png,image/jpeg,image/webp" hidden>
-<script src="export.js"></script><script src="crop.js"></script><script src="app.js"></script></body></html>
+<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="app.js?v=processed-crop"></script></body></html>

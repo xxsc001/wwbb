@@ -216,6 +216,7 @@ const CropTemplates = (() => {
     active.view = constrain(active.source, view);
     const v = active.view;
     const source = active.source, size = sourceSize(source);
+    get('cropPosition').textContent = `取景中心 X ${Math.round(v.x * size.width)} · Y ${Math.round(v.y * size.height)} px`;
     const overviewScale = Math.min(1, 460 / Math.max(size.width, size.height));
     overview.width = Math.max(1, Math.round(size.width * overviewScale));
     overview.height = Math.max(1, Math.round(size.height * overviewScale));
@@ -240,7 +241,7 @@ const CropTemplates = (() => {
     if (!redraw) redraw = requestAnimationFrame(preview);
   }
 
-  function open({source, view, name, onApply}) {
+  function open({source, view, name, processed, onApply}) {
     const {width, height} = sourceSize(source);
     const initial = view || template || {
       width: Math.max(1, Math.round(Math.min(maxSize, width * .8))),
@@ -249,6 +250,7 @@ const CropTemplates = (() => {
     };
     active = {source, name, view: {...initial}, onApply};
     get('cropTitle').textContent = '裁切 · ' + name;
+    get('cropSourceLabel').textContent = processed ? '当前处理结果' : '完整图像';
     get('cropWidth').value = initial.width;
     get('cropHeight').value = initial.height;
     get('cropRotation').value = initial.rotation;
@@ -256,6 +258,7 @@ const CropTemplates = (() => {
     get('cropStatus').textContent = '';
     dialog.showModal();
     preview();
+    overview.focus({preventScroll: true});
   }
 
   function pointerPosition(event) {
@@ -288,6 +291,28 @@ const CropTemplates = (() => {
   for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) {
     overview.addEventListener(name, event => { if (drag?.id === event.pointerId) drag = null; });
   }
+  const arrowOffsets = {
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0]
+  };
+  dialog.addEventListener('keydown', event => {
+    const direction = arrowOffsets[event.key];
+    if (!direction || drag || event.ctrlKey || event.altKey || event.metaKey ||
+        event.target.closest('input, select, textarea, [contenteditable="true"]')) return;
+    const view = readFields();
+    if (!view) return;
+    event.preventDefault();
+    const {width, height} = sourceSize(active.source);
+    const distance = event.shiftKey ? 10 : 1;
+    active.view = constrain(active.source, {
+      ...view,
+      x: view.x + direction[0] * distance / width,
+      y: view.y + direction[1] * distance / height
+    });
+    schedulePreview();
+  });
   for (const field of [...fieldNames, 'cropFormat', 'cropExportSize', 'cropExportCustom']) {
     get(field).addEventListener('input', schedulePreview);
   }

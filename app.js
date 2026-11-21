@@ -213,8 +213,8 @@ async function load(file,index){
  }catch{status('图片读取失败，请尝试其他图片。');}finally{URL.revokeObjectURL(url);loading=false;refresh();}
 }
 
-function replaceImage(index,source,label,crop){
- const image=crop?CropTemplates.render(source,crop):source;
+function replaceImage(index,source,label,crop,cropSource=source){
+ const image=crop?CropTemplates.render(cropSource,crop):source;
  const width=image.naturalWidth||image.width, height=image.naturalHeight||image.height;
  const scale=Math.min(1,2400/Math.max(width,height));
  if(comparing){restore(beforeCompare);comparing=false;}
@@ -226,6 +226,7 @@ function replaceImage(index,source,label,crop){
  side.ctx.drawImage(image,0,0,side.canvas.width,side.canvas.height);
  side.original=side.ctx.getImageData(0,0,side.canvas.width,side.canvas.height);
  side.source=source;
+ side.cropSource=crop?cropSource:null;
  side.label=label;
  side.name=label.replace(/\.[^.]+$/,'');
  side.crop=crop;
@@ -235,15 +236,36 @@ function replaceImage(index,source,label,crop){
  refresh();
 }
 
+function cropInput(side,index){
+ const current=comparing
+  ? beforeCompare[index]
+  : side.ctx.getImageData(0,0,side.canvas.width,side.canvas.height);
+ const baseline=side.original.data;
+ const changed=current.data.some((value,i)=>value!==baseline[i]);
+ if(!changed){
+  const source=side.cropSource||side.source;
+  return {source,view:side.crop,processed:source!==side.source};
+ }
+ // Take a stable copy of the edited pixels, including during original comparison.
+ const source=document.createElement('canvas');
+ source.width=current.width;
+ source.height=current.height;
+ source.getContext('2d').putImageData(current,0,0);
+ return {source,view:null,processed:true};
+}
+
 function openCrop(index){
  if(drawing||loading||exporting||view.drag)return;
  const side=sides[index];
  const label=side.label||side.name+'.png';
+ const input=cropInput(side,index);
  CropTemplates.open({
-  source:side.source,view:side.crop,name:side.name,
+  ...input,name:side.name,
   onApply(crop){
-   if(edited&&!confirm('应用裁切或恢复完整图会替换这张图并清空双图撤销记录。是否继续？'))return false;
-   replaceImage(index,side.source,label,crop);
+   if((history.length||future.length||(!crop&&input.processed))&&!confirm(
+    crop?'应用裁切会清空双图撤销记录。是否继续？':'恢复完整图会清除这张图的处理结果。是否继续？'
+   ))return false;
+   replaceImage(index,side.source,label,crop,input.source);
    zoomTo(1);
    status((index?'右图':'左图')+(crop?'已应用裁切。':'已恢复完整图。'));
    return true;
