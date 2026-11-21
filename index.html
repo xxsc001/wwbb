@@ -1,15 +1,108 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="本地运行的条带图像编辑工作台，支持图片导入、笔刷处理与 PNG 导出。"><title>Band Studio · 条带工作台</title><link rel="stylesheet" href="style.css"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="本地运行的双图编辑工作台，支持双图同步处理和 300 DPI 打包导出。"><title>Band Studio · 条带工作台</title><link rel="stylesheet" href="style.css"></head>
 <body>
 <header class="topbar"><a class="brand" href="./"><span class="brand-icon">▤</span><span>Band Studio<small>条带图像工作台</small></span></a><span class="local">本地处理 · 图片无需上传</span><button class="primary" id="importTop">＋ 导入图片</button></header>
 <main><div class="intro"><div><span class="eyebrow">DUAL IMAGE WORKSPACE</span><h1>一次编辑，双图同步。</h1><p>左右分别导入图片，在左图操作，右图实时同步处理。</p></div><span class="tag">双图联动 · 本地处理</span></div>
 <section class="workspace" aria-label="图像编辑器"><div class="preview-head"><h2>条带预览 <span id="demoBadge">演示图像</span></h2><div class="history"><button id="undo" title="撤销 Ctrl+Z" disabled>↶ <span>撤销</span></button><button id="redo" title="重做 Ctrl+Shift+Z" disabled>↷ <span>重做</span></button><button id="compare" aria-pressed="false">◫ <span>原图对比</span></button></div></div>
-<div class="image-pair"><div class="image-panel"><div class="panel-title"><span><b>左图</b> 操作区域</span><button id="importLeft">＋ 导入左图</button></div><div class="canvas-wrap" id="dropzone"><canvas id="canvas" width="1200" height="780" aria-label="左图编辑画布，在此操作以同步两张图"></canvas><div id="cursor" hidden></div><div class="drop-hint">松开以导入左图</div><span class="image-label" id="imageLabel">DEMO / 模拟条带</span></div></div><div class="image-panel"><div class="panel-title"><span><b>右图</b> 同步结果</span><button id="importRight">＋ 导入右图</button></div><div class="canvas-wrap" id="dropzoneRight"><canvas id="canvasRight" width="1200" height="780" aria-label="右图同步结果，只读预览"></canvas><div id="cursorRight" class="sync-cursor" hidden></div><div class="drop-hint">松开以导入右图</div><span class="image-label" id="imageLabelRight">DEMO / 同步预览</span></div><div id="rightInfo" class="right-info">模拟条带-右图.png · 1200 × 780 px</div></div></div>
+<div class="view-toolbar" aria-label="双图联动视野">
+  <div class="view-mode" role="group" aria-label="左图操作模式">
+    <button id="brushMode" type="button" aria-pressed="true">笔刷编辑</button>
+    <button id="panMode" type="button" aria-pressed="false">移动视野</button>
+  </div>
+  <label class="zoom-control" for="zoom"><span>联动缩放 <output id="zoomValue">100%</output></span>
+    <input id="zoom" type="range" min="100" max="500" step="5" value="100">
+  </label>
+  <button id="resetView" type="button">重置视野</button>
+</div>
+<div class="image-pair"><div class="image-panel"><div class="panel-title"><span><b>左图</b> 操作区域</span><button id="importLeft">＋ 导入左图</button></div><div class="canvas-wrap" id="dropzone"><canvas id="canvas" width="1200" height="780" aria-label="左图操作画布，支持编辑和联动缩放移动"></canvas><div id="cursor" hidden></div><div class="drop-hint">松开以导入左图</div><span class="image-label" id="imageLabel">DEMO / 模拟条带</span></div></div><div class="image-panel"><div class="panel-title"><span><b>右图</b> 同步结果</span><button id="importRight">＋ 导入右图</button></div><div class="canvas-wrap" id="dropzoneRight"><canvas id="canvasRight" width="1200" height="780" aria-label="右图同步结果，只读预览"></canvas><div id="cursorRight" class="sync-cursor" hidden></div><div class="drop-hint">松开以导入右图</div><span class="image-label" id="imageLabelRight">DEMO / 同步预览</span></div><div id="rightInfo" class="right-info">模拟条带-右图.png · 1200 × 780 px</div></div></div>
 <div class="image-info"><span id="fileInfo">模拟条带.png <i>·</i> 1200 × 780 px</span><span id="modeInfo">揉边笔刷 <i>·</i> 拖动以编辑</span></div>
+<section class="crop-toolbar" aria-label="截图模板">
+  <div><h3>截图模板</h3><p id="templateStatus">从一张图片设定固定宽高，供后续图片使用。</p></div>
+  <div class="crop-actions">
+    <button id="cropLeft" type="button">裁切左图</button>
+    <button id="cropRight" type="button">裁切右图</button>
+    <label><input id="autoCrop" type="checkbox" disabled> 导入时自动裁切</label>
+  </div>
+</section>
 <div class="controls"><div class="tool-row"><div class="tools" role="group" aria-label="笔刷工具"><button class="tool active" data-tool="smudge" aria-pressed="true"><span>◌</span> 揉边</button><button class="tool" data-tool="smooth" aria-pressed="false"><span>≈</span> 平滑</button><button class="tool" data-tool="darken" aria-pressed="false"><span>◕</span> 加深</button><button class="tool" data-tool="lighten" aria-pressed="false"><span>◔</span> 减淡</button></div><span class="tool-description" id="toolDescription">沿笔触柔和推移边缘</span></div>
 <div class="sliders"><label for="radius"><span>画笔半径 <output id="radiusValue">10 <small>px</small></output></span><input id="radius" type="range" min="2" max="50" value="10"></label><label for="strength"><span>深浅力度 <output id="strengthValue">45 <small>%</small></output></span><input id="strength" type="range" min="1" max="100" value="45"></label></div>
 <div class="control-footer"><span><kbd>Ctrl</kbd> + <kbd>Z</kbd> 撤销上一步 <span class="divider">|</span> 支持拖入 PNG、JPG、WebP</span><button id="reset" class="text-button">恢复原图</button></div></div>
-<div class="bottom-row"><span id="status" role="status" aria-live="polite">已就绪，在左图拖动笔刷，两图同步变化。</span><div class="exports"><button id="exportLeft">↓ 导出左图</button><button class="primary" id="export">↓ 导出右图</button></div></div></section>
+<section class="export-panel" aria-labelledby="exportHeading">
+  <div class="export-heading"><h3 id="exportHeading">导出设置</h3><span>300 DPI</span></div>
+  <div class="export-options">
+    <label>图片格式
+      <select id="exportFormat">
+        <option value="png">PNG（无损）</option>
+        <option value="jpg">JPEG</option>
+        <option value="tiff">TIFF（无损）</option>
+      </select>
+    </label>
+    <label>像素尺寸
+      <select id="exportSize">
+        <option value="current">保留画布尺寸</option>
+        <option value="1200">长边 1200 px</option>
+        <option value="2400">长边 2400 px</option>
+        <option value="3600">长边 3600 px</option>
+        <option value="custom">自定义长边</option>
+      </select>
+    </label>
+    <label id="exportCustomField" hidden>长边（px）
+      <input id="exportCustom" type="number" min="1" max="4096" step="1" value="3000">
+    </label>
+    <label id="exportQualityField" hidden>JPEG 画质
+      <select id="exportQuality">
+        <option value="1">最高（100%）</option>
+        <option value=".95" selected>高（95%）</option>
+        <option value=".85">标准（85%）</option>
+        <option value=".7">较小文件（70%）</option>
+      </select>
+    </label>
+  </div>
+  <p id="exportDimensions" class="export-dimensions"></p>
+  <div class="bottom-row">
+    <span id="status" role="status" aria-live="polite">已就绪，在左图拖动笔刷，两图同步变化。</span>
+    <button class="primary" id="export" type="button">一键导出两张图（ZIP）</button>
+  </div>
+</section></section>
 <footer><span><b>Band Studio</b> <span class="footer-dot">/</span> 专注图像细节</span><span>原图保留 · 编辑可撤销 · 无需安装</span></footer>
-</main><input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden><input type="file" id="fileRight" accept="image/png,image/jpeg,image/webp" hidden><script src="app.js"></script></body></html>
+</main>
+<dialog id="cropDialog" aria-labelledby="cropTitle">
+  <header class="crop-dialog-heading">
+    <div><h2 id="cropTitle">裁切图片</h2><p>拖动左侧取景框调整位置，右侧查看裁切结果。</p></div>
+    <button id="cropCancel" type="button">关闭</button>
+  </header>
+  <div class="crop-preview">
+    <div><h3>原图与取景范围</h3><canvas id="cropOverview" aria-label="拖动以移动裁切取景框"></canvas></div>
+    <div><h3>裁切预览</h3><canvas id="cropResult" aria-label="裁切结果预览"></canvas></div>
+  </div>
+  <div class="crop-fields">
+    <label>输出宽度（px）<input id="cropWidth" type="number" min="1" max="2400" step="1"></label>
+    <label>输出高度（px）<input id="cropHeight" type="number" min="1" max="2400" step="1"></label>
+    <label>旋转角度（°）<input id="cropRotation" type="number" min="-180" max="180" step="1" value="0"></label>
+    <label>取景倍率 <output id="cropScaleValue">100%</output><input id="cropScale" type="range" min="25" max="400" step="1" value="100"></label>
+  </div>
+  <p id="cropStatus" role="status"></p>
+  <div class="export-options crop-export-options" aria-label="截图导出设置">
+    <label>截图格式 · 300 DPI
+      <select id="cropFormat"><option value="png">PNG（无损）</option><option value="jpg">JPEG</option><option value="tiff">TIFF（无损）</option></select>
+    </label>
+    <label>导出像素尺寸
+      <select id="cropExportSize"><option value="current">保留截图宽高</option><option value="1200">长边 1200 px</option><option value="2400">长边 2400 px</option><option value="3600">长边 3600 px</option><option value="custom">自定义长边</option></select>
+    </label>
+    <label id="cropExportCustomField" hidden>导出长边（px）<input id="cropExportCustom" type="number" min="1" max="4096" step="1" value="3000"></label>
+    <label id="cropQualityField" hidden>JPEG 画质
+      <select id="cropQuality"><option value="1">最高（100%）</option><option value=".95" selected>高（95%）</option><option value=".85">标准（85%）</option><option value=".7">较小文件（70%）</option></select>
+    </label>
+  </div>
+  <div class="crop-dialog-actions">
+    <button id="cropDetect" type="button">自动找条带</button>
+    <button id="cropRestore" type="button">恢复完整图</button>
+    <button id="cropSave" type="button">保存为模板</button>
+    <button id="cropApply" type="button">应用裁切</button>
+    <button id="cropExport" class="primary" type="button">导出这张截图</button>
+  </div>
+</dialog>
+<input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
+<input type="file" id="fileRight" accept="image/png,image/jpeg,image/webp" hidden>
+<script src="export.js"></script><script src="crop.js"></script><script src="app.js"></script></body></html>
