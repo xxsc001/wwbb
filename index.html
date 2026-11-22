@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="本地运行的双图编辑工作台，支持双图同步处理和 300 DPI 打包导出。"><title>Band Studio · 条带工作台</title><link rel="stylesheet" href="style.css"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="本地运行的双图编辑工作台，支持双图同步处理和 300 DPI 打包导出。"><title>Band Studio · 条带工作台</title><link rel="stylesheet" href="style.css?v=wb-intden"></head>
 <body>
 <header class="topbar"><a class="brand" href="./"><span class="brand-icon">▤</span><span>Band Studio<small>条带图像工作台</small></span></a><span class="local">本地处理 · 图片无需上传</span><button class="primary" id="importTop">＋ 导入图片</button></header>
 <main><div class="intro"><div><span class="eyebrow">DUAL IMAGE WORKSPACE</span><h1>一次编辑，双图同步。</h1><p>左右分别导入图片，在左图操作，右图实时同步处理。</p></div><span class="tag">双图联动 · 本地处理</span></div>
@@ -17,7 +17,7 @@
   <button id="resetView" type="button">重置视野</button>
 </div>
 <div class="image-pair"><div class="image-panel"><div class="panel-title"><span><b>左图</b> 操作区域</span><button id="importLeft">＋ 导入左图</button></div><div class="canvas-wrap" id="dropzone"><canvas id="canvas" width="1200" height="780" aria-label="左图操作画布，支持编辑和联动缩放移动"></canvas><div id="cursor" hidden></div><div class="drop-hint">松开以导入左图</div><span class="image-label" id="imageLabel">DEMO / 模拟条带</span></div></div><div class="image-panel"><div class="panel-title"><span><b>右图</b> 同步结果</span><button id="importRight">＋ 导入右图</button></div><div class="canvas-wrap" id="dropzoneRight"><canvas id="canvasRight" width="1200" height="780" aria-label="右图同步结果，只读预览"></canvas><div id="cursorRight" class="sync-cursor" hidden></div><div class="drop-hint">松开以导入右图</div><span class="image-label" id="imageLabelRight">DEMO / 同步预览</span></div><div id="rightInfo" class="right-info">模拟条带-右图.png · 1200 × 780 px</div></div></div>
-<div class="image-info"><span id="fileInfo">模拟条带.png <i>·</i> 1200 × 780 px</span><span id="modeInfo">揉边笔刷 <i>·</i> 拖动以编辑</span></div>
+<div class="image-info"><div class="image-info-tools"><span id="fileInfo">模拟条带.png <i>·</i> 1200 × 780 px</span><button id="measureWB" type="button">测左图 WB IntDen</button></div><span id="modeInfo">揉边笔刷 <i>·</i> 拖动以编辑</span></div>
 <section class="crop-toolbar" aria-label="截图模板">
   <div><h3>截图模板</h3><p id="templateStatus">从一张图片设定固定宽高，供后续图片使用。</p></div>
   <div class="crop-actions">
@@ -104,6 +104,32 @@
     <button id="cropExport" class="primary" type="button">导出这张截图</button>
   </div>
 </dialog>
+<dialog id="wbDialog" aria-labelledby="wbTitle">
+  <header class="crop-dialog-heading">
+    <div><h2 id="wbTitle">WB 灰度测量</h2><p id="wbSource"></p></div>
+    <button id="wbClose" type="button">关闭</button>
+  </header>
+  <div class="wb-tools">
+    <button id="wbBand" type="button" aria-pressed="true">框选条带</button>
+    <button id="wbBackground" type="button" aria-pressed="false">框选背景</button>
+    <label>条带类型 <select id="wbPolarity"><option value="dark">浅底深条带</option><option value="bright">深底亮条带</option></select></label>
+  </div>
+  <canvas id="wbCanvas" aria-label="左图原图，拖动框选测量区域"></canvas>
+  <p id="wbStatus" class="wb-status" role="status"></p>
+  <div class="wb-actions">
+    <button id="wbClearBackground" type="button" disabled>清除背景框</button>
+    <button id="wbSave" class="primary" type="button" disabled>添加到结果</button>
+    <button id="wbCsv" type="button" disabled>下载 CSV</button>
+  </div>
+  <div class="wb-table-wrap" id="wbResults" hidden>
+    <table class="wb-table">
+      <caption>测量结果</caption>
+      <thead><tr><th scope="col">编号</th><th scope="col">面积（px²）</th><th scope="col">平均灰度</th><th scope="col">原始 IntDen</th><th scope="col">背景灰度</th><th scope="col">扣背景 IntDen</th><th scope="col">操作</th></tr></thead>
+      <tbody id="wbRows"></tbody>
+    </table>
+  </div>
+  <p class="wb-note">以左图原图的像素测量。原始 IntDen 是框内灰度之和；扣背景值按条带方向计算，负值保留。浏览器按 8 位灰度读数。</p>
+</dialog>
 <input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
 <input type="file" id="fileRight" accept="image/png,image/jpeg,image/webp" hidden>
-<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="app.js?v=local-dodge"></script></body></html>
+<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="wb.js"></script><script src="app.js?v=wb-intden"></script></body></html>

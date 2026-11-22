@@ -365,6 +365,11 @@ function openCrop(index){
 
 $('cropLeft').onclick=()=>openCrop(0);
 $('cropRight').onclick=()=>openCrop(1);
+$('measureWB').onclick=()=>{
+ if(drawing||loading||exporting||view.drag)return;
+ const left=sides[0];
+ WBMeasure.open(left.source,left.label||left.name);
+};
 $('importTop').textContent='＋ 导入左图';$('importTop').onclick=$('importLeft').onclick=()=>$('file').click();$('importRight').onclick=()=>$('fileRight').click();
 ['file','fileRight'].forEach((id,index)=>{$(id).onchange=e=>{load(e.target.files[0],index);e.target.value='';};});
 ['dropzone','dropzoneRight'].forEach((id,index)=>{let depth=0;const zone=$(id);zone.addEventListener('dragenter',e=>{e.preventDefault();depth++;zone.classList.add('dragover');});zone.addEventListener('dragover',e=>e.preventDefault());zone.addEventListener('dragleave',()=>{if(--depth<=0)zone.classList.remove('dragover');});zone.addEventListener('drop',e=>{e.preventDefault();depth=0;zone.classList.remove('dragover');load(e.dataTransfer.files[0],index);});});

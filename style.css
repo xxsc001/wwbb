@@ -82,6 +82,31 @@ main{max-width:1480px}.image-pair{display:grid;grid-template-columns:1fr 1fr;gap
 .crop-preview canvas {display: block; max-width: 100%; max-height: 42vh; width: auto; height: auto; background: #edf3fa; border-radius: 7px;}
 #cropOverview {cursor: move; touch-action: none;}
 #cropOverview:focus-visible {outline: 2px solid var(--blue); outline-offset: 3px;}
+.image-info {align-items: center;}
+.image-info-tools {display: flex; flex-wrap: wrap; gap: 7px 12px; align-items: center; min-width: 0;}
+.image-info-tools button {padding: 5px 8px; font-size: 12px;}
+#wbDialog {
+  width: min(900px, calc(100% - 24px));
+  max-height: 92vh;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: #183451;
+}
+#wbDialog::backdrop {background: #14294588;}
+.wb-tools, .wb-actions {display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0;}
+.wb-tools label {font-size: 14px;}
+.wb-tools select {margin-left: 4px; border: 1px solid var(--line); border-radius: 6px; background: #f7faff; padding: 7px; color: inherit; font: inherit;}
+.wb-tools button[aria-pressed="true"] {background: #e2efff; border-color: #9ec7f6; color: #15538d;}
+#wbCanvas {display: block; max-width: 100%; height: auto; cursor: crosshair; touch-action: none; border-radius: 6px;}
+.wb-status {margin: 10px 0; min-height: 24px; color: #315b88; line-height: 1.55;}
+.wb-note {color: #526f8e; line-height: 1.55;}
+.wb-table-wrap {overflow-x: auto; margin-bottom: 12px;}
+.wb-table {width: 100%; font-size: 14px; border-collapse: collapse; font-variant-numeric: tabular-nums;}
+.wb-table caption {text-align: left; padding-bottom: 7px; font-weight: 650;}
+.wb-table th, .wb-table td {text-align: left; white-space: nowrap; border-bottom: 1px solid var(--line); padding: 8px;}
+.wb-table th {background: #f7faff;}
+.wb-table td button {padding: 4px 8px;}
 .crop-fields {display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0 10px;}
 .crop-fields label {flex: 1 1 130px; font-size: 14px;}
 .crop-fields input[type=number] {display: block; width: 100%; padding: 8px; margin-top: 5px; border: 1px solid var(--line); border-radius: 6px; font: inherit; color: inherit;}
