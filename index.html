@@ -26,7 +26,7 @@
     <label><input id="autoCrop" type="checkbox" disabled> 导入时自动裁切</label>
   </div>
 </section>
-<div class="controls"><div class="tool-row"><div class="tools" role="group" aria-label="笔刷工具"><button class="tool active" data-tool="smudge" aria-pressed="true"><span>◌</span> 揉边</button><button class="tool" data-tool="smooth" aria-pressed="false"><span>≈</span> 平滑</button><button class="tool" data-tool="darken" aria-pressed="false"><span>◕</span> 加深</button><button class="tool" data-tool="lighten" aria-pressed="false"><span>◔</span> 减淡</button></div><span class="tool-description" id="toolDescription">沿笔触柔和推移边缘</span></div>
+<div class="controls"><div class="tool-row"><div class="tools" role="group" aria-label="笔刷工具"><button class="tool active" data-tool="smudge" aria-pressed="true"><span>◌</span> 揉边</button><button class="tool" data-tool="smooth" aria-pressed="false"><span>≈</span> 平滑</button><button class="tool" data-tool="darken" aria-pressed="false"><span>◕</span> 加深</button><button class="tool" data-tool="lighten" title="参考邻近亮度，只提亮偏暗处" aria-pressed="false"><span>◔</span> 减淡</button></div><span class="tool-description" id="toolDescription">沿笔触柔和推移边缘</span></div>
 <div class="sliders"><label for="radius"><span>画笔半径 <output id="radiusValue">10 <small>px</small></output></span><input id="radius" type="range" min="2" max="50" value="10"></label><label for="strength"><span>深浅力度 <output id="strengthValue">45 <small>%</small></output></span><input id="strength" type="range" min="1" max="100" value="45"></label></div>
 <div class="control-footer"><span><kbd>Ctrl</kbd> + <kbd>Z</kbd> 撤销上一步 <span class="divider">|</span> 支持拖入 PNG、JPG、WebP</span><button id="reset" class="text-button">恢复原图</button></div></div>
 <section class="export-panel" aria-labelledby="exportHeading">
@@ -106,4 +106,4 @@
 </dialog>
 <input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
 <input type="file" id="fileRight" accept="image/png,image/jpeg,image/webp" hidden>
-<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="app.js?v=processed-crop"></script></body></html>
+<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="app.js?v=local-dodge"></script></body></html>

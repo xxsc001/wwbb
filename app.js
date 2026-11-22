@@ -4,7 +4,7 @@ const canvas=$('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true});
 const right=$('canvasRight'),rctx=right.getContext('2d',{willReadFrequently:true});
 const sides=[{canvas,ctx,name:'模拟条带-左图',original:null},{canvas:right,ctx:rctx,name:'模拟条带-右图',original:null}];
 const names={smudge:'揉边',smooth:'平滑',darken:'加深',lighten:'减淡'};
-const descriptions={smudge:'沿笔触柔和推移边缘',smooth:'柔化局部纹理与边缘',darken:'逐步加深笔触覆盖区域',lighten:'逐步提亮笔触覆盖区域'};
+const descriptions={smudge:'沿笔触柔和推移边缘',smooth:'柔化局部纹理与边缘',darken:'逐步加深笔触覆盖区域',lighten:'参考笔刷周围的亮度，柔和提亮偏暗处'};
 let tool='smudge',history=[],future=[],drawing=false,previous=null,comparing=false,edited=false,loading=false,beforeCompare,activePointer;
 let exporting = false;
 const leftViewport = $('dropzone');
@@ -136,6 +136,86 @@ function movePan(e){
  view.y=drag.y+(e.clientY-drag.screenY)/leftViewport.clientHeight;
  renderView();
 }
+
+function luminance(data,index){
+ return .2126*data[index]+.7152*data[index+1]+.0722*data[index+2];
+}
+
+function luminanceAt(image,x,y){
+ if(x<0||y<0||x>image.width-1||y>image.height-1)return null;
+ const left=Math.floor(x),top=Math.floor(y);
+ const right=Math.min(left+1,image.width-1),bottom=Math.min(top+1,image.height-1);
+ const at=(column,row)=>luminance(image.data,(row*image.width+column)*4);
+ const dx=x-left,dy=y-top;
+ const upper=at(left,top)*(1-dx)+at(right,top)*dx;
+ const lower=at(left,bottom)*(1-dx)+at(right,bottom)*dx;
+ return upper*(1-dy)+lower*dy;
+}
+
+function median(values){
+ const sorted=[...values].sort((a,b)=>a-b);
+ const middle=Math.floor(sorted.length/2);
+ return (sorted[middle]+sorted[Math.floor((sorted.length-1)/2)])/2;
+}
+
+function dodgeBackground(source,point,rx,ry){
+ // Points on either side of the brush estimate the local level and its gradient.
+ const pairs=[];
+ for(const radius of [1.3,1.65,2]){
+  for(const angle of [0,Math.PI/4,Math.PI/2,Math.PI*3/4]){
+   const x=Math.cos(angle)*radius,y=Math.sin(angle)*radius;
+   const plus=luminanceAt(source,point.x+x*rx,point.y+y*ry);
+   const minus=luminanceAt(source,point.x-x*rx,point.y-y*ry);
+   if(plus!==null&&minus!==null)pairs.push({x,y,plus,minus,center:(plus+minus)/2});
+  }
+ }
+ if(!pairs.length)return null;
+ const center=median(pairs.map(pair=>pair.center));
+ const deviation=median(pairs.map(pair=>Math.abs(pair.center-center)));
+ const tolerance=Math.max(4,Math.min(16,2*deviation));
+ // A small diagonal term keeps the fit stable when the image edge leaves only one axis.
+ let xx=.001,yy=.001,xy=0,bx=0,by=0,minimum=center,maximum=center;
+ for(const pair of pairs){
+  if(Math.abs(pair.center-center)>tolerance)continue;
+  const {x,y,plus,minus}=pair;
+  const difference=(plus-minus)/2;
+  xx+=x*x; yy+=y*y; xy+=x*y;
+  bx+=x*difference; by+=y*difference;
+  minimum=Math.min(minimum,plus,minus);
+  maximum=Math.max(maximum,plus,minus);
+ }
+ const determinant=xx*yy-xy*xy;
+ const slopeX=(yy*bx-xy*by)/determinant;
+ const slopeY=(xx*by-xy*bx)/determinant;
+ return (x,y)=>Math.max(minimum,Math.min(maximum,center+slopeX*x+slopeY*y));
+}
+
+function dodgeDab(side,point,rx,ry,strength,reference){
+ const background=dodgeBackground(reference,point,rx,ry);
+ if(!background)return;
+ const x0=Math.max(0,Math.floor(point.x-rx)),y0=Math.max(0,Math.floor(point.y-ry));
+ const x1=Math.min(side.canvas.width,Math.ceil(point.x+rx));
+ const y1=Math.min(side.canvas.height,Math.ceil(point.y+ry));
+ if(x1<=x0||y1<=y0)return;
+ const image=side.ctx.getImageData(x0,y0,x1-x0,y1-y0);
+ let changed=false;
+ for(let y=0;y<image.height;y++){
+  for(let x=0;x<image.width;x++){
+   const dx=(x+x0-point.x)/rx,dy=(y+y0-point.y)/ry;
+   const distanceSquared=dx*dx+dy*dy;
+   if(distanceSquared>=1)continue;
+   const index=(y*image.width+x)*4;
+   const gap=background(dx,dy)-luminance(image.data,index);
+   if(gap<1)continue;
+   const lift=Math.min(Math.floor(gap),Math.round(gap*(1-distanceSquared)**2*strength*.42));
+   if(!lift)continue;
+   for(let channel=0;channel<3;channel++)image.data[index+channel]+=lift;
+   changed=true;
+  }
+ }
+ if(changed)side.ctx.putImageData(image,x0,y0);
+}
+
 function dab(s,p,delta,rx,ry){
  const strength=Number($('strength').value)/100;
  const x0=Math.max(0,Math.floor(p.x-rx-3)),y0=Math.max(0,Math.floor(p.y-ry-3));
@@ -148,7 +228,6 @@ function dab(s,p,delta,rx,ry){
   for(let c=0;c<3;c++){
    const value=src[index+c];let target;
    if(tool==='darken')target=value*.55;
-   else if(tool==='lighten')target=value+(255-value)*.45;
    else if(tool==='smooth'){target=0;for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++)target+=sample(x+dx,y+dy,c);target/=25;}
    else target=sample(Math.round(x-delta.x),Math.round(y-delta.y),c);
    img.data[index+c]=value+(target-value)*amount;
@@ -156,7 +235,18 @@ function dab(s,p,delta,rx,ry){
  }
  s.ctx.putImageData(img,x0,y0);
 }
-function synchronizedDab(p,delta){const radius=Number($('radius').value);sides.forEach(s=>{const sx=s.canvas.width/canvas.width,sy=s.canvas.height/canvas.height;dab(s,{x:p.x*sx,y:p.y*sy},{x:delta.x*sx,y:delta.y*sy},radius*sx,radius*sy);});}
+function synchronizedDab(point,delta){
+ const radius=Number($('radius').value);
+ const strength=Number($('strength').value)/100;
+ // Reuse the undo snapshot so earlier dabs cannot raise the target within the same stroke.
+ const reference=history.at(-1);
+ sides.forEach((side,index)=>{
+  const sx=side.canvas.width/canvas.width,sy=side.canvas.height/canvas.height;
+  const position={x:point.x*sx,y:point.y*sy};
+  if(tool==='lighten')dodgeDab(side,position,radius*sx,radius*sy,strength,reference[index]);
+  else dab(side,position,{x:delta.x*sx,y:delta.y*sy},radius*sx,radius*sy);
+ });
+}
 canvas.addEventListener('pointerdown',e=>{
  if(e.button!==0||drawing||view.drag)return;
  if(view.mode==='pan'){
