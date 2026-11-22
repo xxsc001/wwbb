@@ -23,6 +23,7 @@ const WBAuto=(()=>{
   const span=window?window.bottom-window.top:width;
   const fractions=window?[.09,.17,.28,.43]:[.006,.013,.024,.037];
   const radii=fractions.map(fraction=>Math.max(2,Math.round(span*fraction)));
+  if(window)for(const fraction of [.035,.065])radii.push(Math.max(2,Math.round(width*fraction)));
   const direction=type==='dark'?1:-1;
   for(const radius of new Set(radii)){
    for(let y=radius;y<height-radius;y++){
@@ -102,6 +103,43 @@ const WBAuto=(()=>{
   return best;
  }
 
+ function splitAtValleys(profile,run,separation,floor){
+  if(run.right-run.left<separation*1.6)return [run];
+  const peaks=[];
+  for(let x=run.left;x<run.right;){
+   const level=profile[x];
+   let end=x+1;
+   while(end<run.right&&profile[end]===level)end++;
+   if(level>=floor*1.5&&level>(profile[x-1]??0)&&level>(profile[end]??0)){
+    peaks.push({x:Math.floor((x+end-1)/2),level});
+   }
+   x=end;
+  }
+  const selected=[];
+  peaks.sort((a,b)=>b.level-a.level);
+  for(const peak of peaks){
+   if(selected.every(other=>Math.abs(other.x-peak.x)>=separation))selected.push(peak);
+  }
+  selected.sort((a,b)=>a.x-b.x);
+  const cuts=[];
+  for(let i=1;i<selected.length;i++){
+   const a=selected[i-1],b=selected[i];
+   const weaker=Math.min(a.level,b.level);
+   const inside=Math.max(2,Math.floor((b.x-a.x)*.15));
+   const middle=(a.x+b.x)/2;
+   let valley=a.x+inside;
+   for(let x=valley+1;x<=b.x-inside;x++){
+    if(profile[x]<profile[valley]||(profile[x]===profile[valley]&&Math.abs(x-middle)<Math.abs(valley-middle)))valley=x;
+   }
+   if(profile[valley]<=weaker*.48&&weaker-profile[valley]>=8){
+    const left=cuts.at(-1)??run.left;
+    if(valley-left>=separation*.68&&run.right-valley>=separation*.68)cuts.push(valley);
+   }
+  }
+  const edges=[run.left,...cuts,run.right];
+  return edges.slice(1).map((right,i)=>({left:edges[i],right}));
+ }
+
  function scopedRow(signal,width,window,limit){
   // Work from a horizontal signal profile so a connected blob can span multiple lanes.
   const rowTotals=new Float32Array(window.bottom-window.top);
@@ -119,24 +157,30 @@ const WBAuto=(()=>{
   while(top>window.top&&rowTotals[top-1-window.top]>=edge)top--;
   while(bottom<window.bottom&&rowTotals[bottom-window.top]>=edge)bottom++;
 
-  const profile=new Float32Array(width);
+  const rawProfile=new Float32Array(width);
   for(let x=0;x<width;x++){
-   for(let y=top;y<bottom;y++)profile[x]+=signal[y*width+x]/(bottom-top);
+   for(let y=top;y<bottom;y++)rawProfile[x]+=signal[y*width+x]/(bottom-top);
   }
+  const profile=rawProfile.map((center,x)=>
+   ((rawProfile[x-2]??center)+2*(rawProfile[x-1]??center)+3*center+
+    2*(rawProfile[x+1]??center)+(rawProfile[x+2]??center))/9
+  );
   const floor=Math.max(4,Math.min(12,Math.max(...profile)*.10));
   const minimumWidth=Math.max(4,Math.round(width*.015));
-  const runs=[];
+  const connected=[];
   let start=-1,last=-1;
   for(let x=0;x<=width;x++){
    if(x<width&&profile[x]>=floor){
     if(start===-1)start=x;
     last=x;
    }else if(start!==-1&&(x===width||x-last>2)){
-    if(last-start+1>=minimumWidth)runs.push({left:start,right:last+1});
+    if(last-start+1>=minimumWidth)connected.push({left:start,right:last+1});
     start=-1;
    }
   }
-  if(!runs.length)return [];
+  if(!connected.length)return [];
+  const separation=Math.max(6,Math.round(width*.055));
+  const runs=connected.flatMap(run=>splitAtValleys(profile,run,separation,floor));
 
   const sizes=runs.map(run=>run.right-run.left).sort((a,b)=>a-b);
   const typical=median(sizes.slice(0,Math.max(1,Math.ceil(sizes.length*.75))));
@@ -197,8 +241,10 @@ const WBAuto=(()=>{
    const pad=band.width*.07;
    const edgeLeft=band.x-band.width/2,edgeRight=band.x+band.width/2;
    const previous=bands[i-1],next=bands[i+1];
-   const left=scoped?Math.max(edgeLeft-pad,previous?Math.min(edgeLeft,(previous.x+band.x)/2):-Infinity):band.x-width/(2*sx);
-   const right=scoped?Math.min(edgeRight+pad,next?Math.max(edgeRight,(next.x+band.x)/2):Infinity):left+width/sx;
+   const leftDivider=previous?(previous.x+previous.width/2+edgeLeft)/2:-Infinity;
+   const rightDivider=next?(edgeRight+next.x-next.width/2)/2:Infinity;
+   const left=scoped?Math.max(edgeLeft-pad,leftDivider):band.x-width/(2*sx);
+   const right=scoped?Math.min(edgeRight+pad,rightDivider):left+width/sx;
    const x=Math.max(0,Math.min(imageWidth-1,Math.round(range.x+left*sx)));
    const w=scoped?Math.max(1,Math.min(imageWidth-x,Math.round(range.x+right*sx)-x)):width;
    return {

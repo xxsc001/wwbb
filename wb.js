@@ -7,6 +7,7 @@ const WBMeasure = (() => {
  const polarity=byId('wbPolarity');
  let source, sourceWidth, sourceHeight, preview, label;
  const colors={band:'#157cef',background:'#00a16a',scope:'#c26b10'};
+ const backgroundDirections={ArrowLeft:[-1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowRight:[1,0]};
  let mode='band', regions, stats, results, sequence, drag, autoSummary='';
 
  function regionFromPoints(a,b){
@@ -60,6 +61,7 @@ const WBMeasure = (() => {
   const {band,background}=stats;
   byId('wbSave').disabled=!band;
   byId('wbClearBackground').disabled=!background;
+  for(const key of Object.keys(backgroundDirections))byId('wbBg'+key.slice(5)).disabled=!background;
   byId('wbClearScope').disabled=!regions.scope;
   const instructions={
    band:'在图上拖出条带框。',
@@ -69,7 +71,9 @@ const WBMeasure = (() => {
   const readout=band
    ? `条带 ${regions.band.width} × ${regions.band.height} px · 原始 IntDen ${format(band.sum)} · 扣背景 ${format(correctedIntensity(band,background,polarity.value))}`
    : '尚未选定条带。';
-  const backgroundReadout=background?` 背景平均灰度 ${format(background.mean)}。`:'';
+  const backgroundReadout=background
+   ? ` 背景平均灰度 ${format(background.mean)}，位置 X ${regions.background.x} / Y ${regions.background.y}。`
+   : band?' 未找到合适背景，可手动框选。':'';
   byId('wbStatus').textContent=autoSummary||instructions[mode]+' '+readout+backgroundReadout;
  }
 
@@ -158,6 +162,11 @@ const WBMeasure = (() => {
    autoSummary='';
    regions[selected]=region;
    if(selected!=='scope')stats[selected]=measureRegion(source,region);
+   if(selected==='band'){
+    const excluded=[region,...results.map(entry=>entry.bandRegion)];
+    const {backgroundRegions}=nearbyBackground(region,polarity.value,excluded);
+    setBackground(backgroundRegions[0]??null);
+   }
   }
   paint();
   updateStatus();
@@ -180,10 +189,38 @@ const WBMeasure = (() => {
   paint();
   updateStatus();
  };
+ function setBackground(region){
+  regions.background=region;
+  stats.background=region?measureRegion(source,region):null;
+ }
+
+ function moveBackground(direction,step){
+  const region=regions?.background;
+  if(!region||drag)return;
+  const [dx,dy]=direction;
+  const x=Math.max(0,Math.min(sourceWidth-region.width,region.x+step*dx));
+  const y=Math.max(0,Math.min(sourceHeight-region.height,region.y+step*dy));
+  if(region.x===x&&region.y===y)return;
+  autoSummary='';
+  setBackground({...region,x,y});
+  paint();
+  updateStatus();
+ }
+
+ for(const [key,direction] of Object.entries(backgroundDirections)){
+  byId('wbBg'+key.slice(5)).onclick=event=>moveBackground(direction,event?.shiftKey?10:1);
+ }
+ dialog.addEventListener('keydown',event=>{
+  const direction=backgroundDirections[event.key];
+  if(!direction||!regions?.background||drag||event.ctrlKey||event.altKey||event.metaKey||
+      event.target.closest('input, select, textarea, [contenteditable="true"]'))return;
+  event.preventDefault();
+  moveBackground(direction,event.shiftKey?10:1);
+ });
+
  byId('wbClearBackground').onclick=()=>{
   autoSummary='';
-  regions.background=null;
-  stats.background=null;
+  setBackground(null);
   paint();
   updateStatus();
  };
@@ -203,7 +240,7 @@ const WBMeasure = (() => {
  };
 
  function detectInRange(search,type,limit,scoped){
-  const margin=scoped?Math.max(4,Math.ceil(search.height*.55)):0;
+  const margin=scoped?Math.max(4,Math.ceil(search.height*.55),Math.ceil(search.width*.075)):0;
   const y=Math.max(0,search.y-margin);
   const bottom=Math.min(sourceHeight,search.y+search.height+margin);
   const range={...search,y,height:bottom-y};
