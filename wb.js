@@ -6,13 +6,14 @@ const WBMeasure = (() => {
  const canvas=byId('wbCanvas');
  const polarity=byId('wbPolarity');
  let source, sourceWidth, sourceHeight, preview, label;
- let mode='band', regions, stats, results, sequence, drag;
+ const colors={band:'#157cef',background:'#00a16a',scope:'#c26b10'};
+ let mode='band', regions, stats, results, sequence, drag, autoSummary='';
 
  function regionFromPoints(a,b){
   return {x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),width:Math.abs(a.x-b.x),height:Math.abs(a.y-b.y)};
  }
 
- function measureRegion(image,region){
+ function measureRegion(image,region,withHistogram=false){
   const tile=document.createElement('canvas');
   const tileSize=512;
   tile.width=Math.min(tileSize,region.width);
@@ -20,6 +21,7 @@ const WBMeasure = (() => {
   const context=tile.getContext('2d',{willReadFrequently:true});
   context.fillStyle='#fff';
   let sum=0;
+  const histogram=withHistogram?new Uint32Array(256):null;
   for(let y=0;y<region.height;y+=tileSize){
    for(let x=0;x<region.width;x+=tileSize){
     const w=Math.min(tileSize,region.width-x);
@@ -28,12 +30,14 @@ const WBMeasure = (() => {
     context.drawImage(image,region.x+x,region.y+y,w,h,0,0,w,h);
     const pixels=context.getImageData(0,0,w,h).data;
     for(let i=0;i<pixels.length;i+=4){
-     sum+=Math.round((299*pixels[i]+587*pixels[i+1]+114*pixels[i+2])/1000);
+     const gray=Math.round((299*pixels[i]+587*pixels[i+1]+114*pixels[i+2])/1000);
+     sum+=gray;
+     if(histogram)histogram[gray]++;
     }
    }
   }
   const area=region.width*region.height;
-  return {area,mean:sum/area,sum};
+  return {area,mean:sum/area,sum,histogram};
  }
 
  function correctedIntensity(band,background,type){
@@ -48,6 +52,7 @@ const WBMeasure = (() => {
   mode=next;
   byId('wbBand').setAttribute('aria-pressed',String(next==='band'));
   byId('wbBackground').setAttribute('aria-pressed',String(next==='background'));
+  byId('wbScope').setAttribute('aria-pressed',String(next==='scope'));
   updateStatus();
  }
 
@@ -55,12 +60,17 @@ const WBMeasure = (() => {
   const {band,background}=stats;
   byId('wbSave').disabled=!band;
   byId('wbClearBackground').disabled=!background;
-  const instruction=mode==='band'?'在图上拖出条带框。':'在同一图中框选附近没有条带的背景。';
+  byId('wbClearScope').disabled=!regions.scope;
+  const instructions={
+   band:'在图上拖出条带框。',
+   background:'在同一图中框选附近没有条带的背景。',
+   scope:'拖框圈住目标那一排条带，再点击「自动框选」。'
+  };
   const readout=band
    ? `条带 ${regions.band.width} × ${regions.band.height} px · 原始 IntDen ${format(band.sum)} · 扣背景 ${format(correctedIntensity(band,background,polarity.value))}`
    : '尚未选定条带。';
   const backgroundReadout=background?` 背景平均灰度 ${format(background.mean)}。`:'';
-  byId('wbStatus').textContent=instruction+' '+readout+backgroundReadout;
+  byId('wbStatus').textContent=autoSummary||instructions[mode]+' '+readout+backgroundReadout;
  }
 
  function paint(){
@@ -79,10 +89,16 @@ const WBMeasure = (() => {
     context.fillText(number,x*sx+4,y*sy+14);
    }
   }
-  for(const entry of results)outline(entry.bandRegion,'#2d6abe',entry.id);
-  outline(regions.band,'#157cef');
-  outline(regions.background,'#00a16a');
-  if(drag)outline(regionFromPoints(drag.start,drag.end),drag.mode==='band'?'#157cef':'#00a16a');
+  outline(regions.scope,colors.scope);
+  for(const entry of results){
+   if(entry.automatic){
+    for(const background of entry.backgroundRegions)outline(background,colors.background);
+   }
+   outline(entry.bandRegion,'#2d6abe',entry.id);
+  }
+  outline(regions.band,colors.band);
+  outline(regions.background,colors.background);
+  if(drag)outline(regionFromPoints(drag.start,drag.end),colors[drag.mode]);
  }
 
  function updateRows(){
@@ -90,7 +106,7 @@ const WBMeasure = (() => {
   body.replaceChildren();
   for(const entry of results){
    const row=document.createElement('tr');
-   for(const text of [entry.id,format(entry.band.area),format(entry.band.mean),format(entry.band.sum),format(entry.background?.mean??null),format(entry.corrected)]){
+   for(const text of [entry.automatic?entry.id+' 自动':entry.id,format(entry.band.area),format(entry.band.mean),format(entry.band.sum),format(entry.background?.mean??null),format(entry.corrected)]){
     const cell=document.createElement('td');
     cell.textContent=text;
     row.append(cell);
@@ -138,8 +154,9 @@ const WBMeasure = (() => {
   const selected=drag.mode;
   drag=null;
   if(region.width&&region.height){
+   autoSummary='';
    regions[selected]=region;
-   stats[selected]=measureRegion(source,region);
+   if(selected!=='scope')stats[selected]=measureRegion(source,region);
   }
   paint();
   updateStatus();
@@ -152,10 +169,18 @@ const WBMeasure = (() => {
   });
  }
 
- byId('wbBand').onclick=()=>setMode('band');
- byId('wbBackground').onclick=()=>setMode('background');
- polarity.onchange=updateStatus;
+ for(const [id,next] of [['wbBand','band'],['wbBackground','background'],['wbScope','scope']]){
+  byId(id).onclick=()=>{autoSummary='';setMode(next);};
+ }
+ polarity.onchange=()=>{autoSummary='';updateStatus();};
+ byId('wbClearScope').onclick=()=>{
+  regions.scope=null;
+  autoSummary='';
+  paint();
+  updateStatus();
+ };
  byId('wbClearBackground').onclick=()=>{
+  autoSummary='';
   regions.background=null;
   stats.background=null;
   paint();
@@ -170,15 +195,103 @@ const WBMeasure = (() => {
   });
   regions.band=null;
   stats.band=null;
+  autoSummary='';
   setMode('band');
   updateRows();
   paint();
  };
+
+ function detectInRange(range,type,limit){
+  const scale=Math.min(1,800/range.width,420/range.height);
+  const sample=document.createElement('canvas');
+  const width=sample.width=Math.max(1,Math.round(range.width*scale));
+  const height=sample.height=Math.max(1,Math.round(range.height*scale));
+  const context=sample.getContext('2d',{willReadFrequently:true});
+  context.fillStyle='#fff';
+  context.fillRect(0,0,width,height);
+  context.drawImage(source,range.x,range.y,range.width,range.height,0,0,width,height);
+  const pixels=context.getImageData(0,0,width,height).data;
+  const gray=new Uint8Array(width*height);
+  for(let i=0;i<gray.length;i++)gray[i]=Math.round((299*pixels[4*i]+587*pixels[4*i+1]+114*pixels[4*i+2])/1000);
+  const bands=WBAuto.detect(gray,width,height,type,limit);
+  return WBAuto.originalBoxes(bands,range,width,height,sourceWidth,sourceHeight);
+ }
+
+ function cleanBackground(region,type){
+  const sample=measureRegion(source,region,true);
+  const levels=sample.histogram;
+  let cumulative=0,medianGray=0;
+  for(;medianGray<255;medianGray++){
+   cumulative+=levels[medianGray];
+   if(cumulative>=sample.area/2)break;
+  }
+  let offTone=0;
+  for(let gray=0;gray<256;gray++){
+   if(type==='dark'?gray<medianGray-12:gray>medianGray+12)offTone+=levels[gray];
+  }
+  return offTone<=sample.area*.22?{region,mean:sample.mean,sum:sample.sum,area:sample.area}:null;
+ }
+
+ function nearbyBackground(band,type,boxes){
+  const gap=Math.max(2,Math.round(band.height*.28));
+  const height=Math.max(2,Math.round(band.height*.55));
+  const overlap=(a,b)=>a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+a.height>b.y;
+  const samples=[];
+  for(const direction of [-1,1]){
+   for(const offset of [gap,gap+height]){
+    const y=direction<0?band.y-offset-height:band.y+band.height+offset;
+    const region={x:band.x,y,width:band.width,height};
+    if(y<0||y+height>sourceHeight||boxes.some(box=>overlap(region,box)))continue;
+    const result=cleanBackground(region,type);
+    if(result){samples.push(result);break;}
+   }
+  }
+  if(samples.length===2&&Math.abs(samples[0].mean-samples[1].mean)>16){
+   // A much darker (or brighter, for bright bands) flank may contain a second band.
+   samples.sort((a,b)=>type==='dark'?b.mean-a.mean:a.mean-b.mean);
+   samples.length=1;
+  }
+  if(!samples.length)return {background:null,backgroundRegions:[]};
+  const totalArea=samples.reduce((sum,sample)=>sum+sample.area,0);
+  const totalGray=samples.reduce((sum,sample)=>sum+sample.sum,0);
+  return {background:{mean:totalGray/totalArea},backgroundRegions:samples.map(sample=>sample.region)};
+ }
+
+ byId('wbAuto').onclick=()=>{
+  if(!source||drag)return;
+  const range=regions.scope||{x:0,y:0,width:sourceWidth,height:sourceHeight};
+  const type=polarity.value;
+  const limit=Number(byId('wbCount').value)||6;
+  const boxes=detectInRange(range,type,limit);
+  if(!boxes.length||(!regions.scope&&boxes.length<2)){
+   autoSummary='未识别到明显的一排条带。可限定目标范围、检查条带类型，或手动框选。';
+   updateStatus();
+   return;
+  }
+  const automatic=boxes.map(bandRegion=>{
+   const band=measureRegion(source,bandRegion);
+   const {background,backgroundRegions}=nearbyBackground(bandRegion,type,boxes);
+   return {
+    id:++sequence,band,background,bandRegion,backgroundRegions,
+    backgroundRegion:backgroundRegions[0],type,automatic:true,
+    corrected:correctedIntensity(band,background,type)
+   };
+  });
+  results=[...results.filter(entry=>!entry.automatic),...automatic];
+  const corrected=automatic.filter(entry=>entry.background).length;
+  autoSummary=`自动框选 ${boxes.length} 条，已为 ${corrected} 条校正背景。请核对蓝框和绿框。`;
+  if(boxes.length<limit)autoSummary+=' 部分条带可能未识别，可用手动框选补测。';
+  if(corrected<boxes.length)autoSummary+=' 未选到合适背景的条带仅显示原始 IntDen。';
+  updateStatus();
+  updateRows();
+  paint();
+ };
+
  byId('wbCsv').onclick=()=>{
   const geometry=region=>region?[region.x,region.y,region.width,region.height]:['','','',''];
-  const rows=[['ID','Area_px2','Mean_gray','RawIntDen','Background_mean_gray','Corrected_IntDen','Band_type','Band_x_px','Band_y_px','Band_width_px','Band_height_px','Background_x_px','Background_y_px','Background_width_px','Background_height_px']];
+  const rows=[['ID','Area_px2','Mean_gray','RawIntDen','Background_mean_gray','Corrected_IntDen','Band_type','Band_x_px','Band_y_px','Band_width_px','Band_height_px','Background_x_px','Background_y_px','Background_width_px','Background_height_px','Background2_x_px','Background2_y_px','Background2_width_px','Background2_height_px','Method']];
   for(const entry of results){
-   rows.push([entry.id,entry.band.area,entry.band.mean,entry.band.sum,entry.background?.mean??'',entry.corrected??'',entry.type,...geometry(entry.bandRegion),...geometry(entry.backgroundRegion)]);
+   rows.push([entry.id,entry.band.area,entry.band.mean,entry.band.sum,entry.background?.mean??'',entry.corrected??'',entry.type,...geometry(entry.bandRegion),...geometry(entry.backgroundRegion),...geometry(entry.backgroundRegions?.[1]),entry.automatic?'automatic':'manual']);
   }
   const csv=rows.map(row=>row.join(',')).join('\r\n')+'\r\n';
   ImageExport.download(new Blob([csv],{type:'text/csv;charset=utf-8'}),'wb-intden.csv');
@@ -204,10 +317,11 @@ const WBMeasure = (() => {
    context.fillStyle='#fff';
    context.fillRect(0,0,preview.width,preview.height);
    context.drawImage(source,0,0,preview.width,preview.height);
-   regions={band:null,background:null};
+   regions={band:null,background:null,scope:null};
    stats={band:null,background:null};
    results=[];
    sequence=0;
+   autoSummary='';
    polarity.value='dark';
    setMode('band');
   }

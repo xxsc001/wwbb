@@ -112,7 +112,13 @@
   <div class="wb-tools">
     <button id="wbBand" type="button" aria-pressed="true">框选条带</button>
     <button id="wbBackground" type="button" aria-pressed="false">框选背景</button>
+    <button id="wbScope" type="button" aria-pressed="false">限定范围</button>
     <label>条带类型 <select id="wbPolarity"><option value="dark">浅底深条带</option><option value="bright">深底亮条带</option></select></label>
+  </div>
+  <div class="wb-tools">
+    <button id="wbAuto" class="primary" type="button">自动框选</button>
+    <label>最多识别 <select id="wbCount"><option value="6">6 条</option><option value="5">5 条</option></select></label>
+    <button id="wbClearScope" type="button" disabled>清除范围</button>
   </div>
   <canvas id="wbCanvas" aria-label="左图原图，拖动框选测量区域"></canvas>
   <p id="wbStatus" class="wb-status" role="status"></p>
@@ -128,8 +134,8 @@
       <tbody id="wbRows"></tbody>
     </table>
   </div>
-  <p class="wb-note">以左图原图的像素测量。原始 IntDen 是框内灰度之和；扣背景值按条带方向计算，负值保留。浏览器按 8 位灰度读数。</p>
+  <p class="wb-note">蓝框是条带，绿框是背景，橙框是识别范围。自动框选优先找同一排的条带，并为每条选附近的背景。请核对框选结果。读数基于左图原图的 8 位灰度。</p>
 </dialog>
 <input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
 <input type="file" id="fileRight" accept="image/png,image/jpeg,image/webp" hidden>
-<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="wb.js"></script><script src="app.js?v=wb-intden"></script></body></html>
+<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="wb-auto.js"></script><script src="wb.js?v=auto-roi"></script><script src="app.js?v=wb-intden"></script></body></html>
