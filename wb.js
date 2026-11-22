@@ -5,7 +5,9 @@ const WBMeasure = (() => {
  const dialog=byId('wbDialog');
  const canvas=byId('wbCanvas');
  const polarity=byId('wbPolarity');
- let source, sourceWidth, sourceHeight, preview, label;
+ const imageSource=byId('wbImageSource');
+ const sessions={current:null,original:null};
+ let source, sourceWidth, sourceHeight, preview, images, activeType, frame;
  const colors={band:'#157cef',background:'#00a16a',scope:'#c26b10'};
  const backgroundDirections={ArrowLeft:[-1,0],ArrowUp:[0,-1],ArrowDown:[0,1],ArrowRight:[1,0]};
  let mode='band', regions, stats, results, sequence, drag, autoSummary='';
@@ -132,6 +134,7 @@ const WBMeasure = (() => {
   }
   byId('wbResults').hidden=!results.length;
   byId('wbCsv').disabled=!results.length;
+  byId('wbClearAuto').disabled=!results.some(entry=>entry.automatic);
  }
 
  function locate(event){
@@ -186,6 +189,15 @@ const WBMeasure = (() => {
  byId('wbClearScope').onclick=()=>{
   regions.scope=null;
   autoSummary='';
+  paint();
+  updateStatus();
+ };
+ byId('wbClearAuto').onclick=()=>{
+  const count=results.filter(entry=>entry.automatic).length;
+  if(!count)return;
+  results=results.filter(entry=>!entry.automatic);
+  autoSummary=`已清除 ${count} 个自动框选结果。`;
+  updateRows();
   paint();
   updateStatus();
  };
@@ -337,10 +349,10 @@ const WBMeasure = (() => {
 
  byId('wbCsv').onclick=()=>{
   const geometry=region=>region?[region.x,region.y,region.width,region.height]:['','','',''];
-  const rows=[['ID','Area_px2','Mean_gray','RawIntDen','Background_mean_gray','Corrected_IntDen','Band_type','Band_x_px','Band_y_px','Band_width_px','Band_height_px','Background_x_px','Background_y_px','Background_width_px','Background_height_px','Background2_x_px','Background2_y_px','Background2_width_px','Background2_height_px','Method']];
+  const rows=[['ID','Area_px2','Mean_gray','RawIntDen','Background_mean_gray','Corrected_IntDen','Band_type','Band_x_px','Band_y_px','Band_width_px','Band_height_px','Background_x_px','Background_y_px','Background_width_px','Background_height_px','Background2_x_px','Background2_y_px','Background2_width_px','Background2_height_px','Image_source','Method']];
   for(const entry of results){
    const method=entry.bandRegion.inferred?'automatic_split_review':entry.automatic?'automatic':'manual';
-   rows.push([entry.id,entry.band.area,entry.band.mean,entry.band.sum,entry.background?.mean??'',entry.corrected??'',entry.type,...geometry(entry.bandRegion),...geometry(entry.backgroundRegion),...geometry(entry.backgroundRegions?.[1]),method]);
+   rows.push([entry.id,entry.band.area,entry.band.mean,entry.band.sum,entry.background?.mean??'',entry.corrected??'',entry.type,...geometry(entry.bandRegion),...geometry(entry.backgroundRegion),...geometry(entry.backgroundRegions?.[1]),activeType==='current'?'current_left':'original_import',method]);
   }
   const csv=rows.map(row=>row.join(',')).join('\r\n')+'\r\n';
   ImageExport.download(new Blob([csv],{type:'text/csv;charset=utf-8'}),'wb-intden.csv');
@@ -349,34 +361,69 @@ const WBMeasure = (() => {
  byId('wbClose').onclick=()=>dialog.close();
  dialog.addEventListener('close',()=>{drag=null;});
 
- function open(image,name){
-  if(dialog.open)return;
-  if(image!==source){
-   source=image;
-   label=name;
-   sourceWidth=source.naturalWidth||source.width;
-   sourceHeight=source.naturalHeight||source.height;
-   const scale=Math.min(1,860/sourceWidth,450/sourceHeight);
-   canvas.width=Math.max(1,Math.round(sourceWidth*scale));
-   canvas.height=Math.max(1,Math.round(sourceHeight*scale));
-   preview=document.createElement('canvas');
-   preview.width=canvas.width;
-   preview.height=canvas.height;
-   const context=preview.getContext('2d');
-   context.fillStyle='#fff';
-   context.fillRect(0,0,preview.width,preview.height);
-   context.drawImage(source,0,0,preview.width,preview.height);
+ function refreshMeasurements(){
+  for(const kind of ['band','background'])stats[kind]=regions[kind]?measureRegion(source,regions[kind]):null;
+  for(const entry of results){
+   entry.band=measureRegion(source,entry.bandRegion);
+   const frames=entry.backgroundRegions??(entry.backgroundRegion?[entry.backgroundRegion]:[]);
+   let sum=0,area=0;
+   for(const region of frames){
+    const measured=measureRegion(source,region);
+    sum+=measured.sum;
+    area+=measured.area;
+   }
+   entry.background=area?{mean:sum/area}:null;
+   entry.corrected=correctedIntensity(entry.band,entry.background,entry.type);
+  }
+ }
+
+ function selectSource(type){
+  if(activeType)sessions[activeType]={frame,regions,stats,results,sequence,mode,polarity:polarity.value};
+  activeType=type;
+  imageSource.value=type;
+  frame=type==='current'?images.frame:images.original;
+  source=images[type];
+  sourceWidth=source.naturalWidth||source.width;
+  sourceHeight=source.naturalHeight||source.height;
+  const scale=Math.min(1,860/sourceWidth,450/sourceHeight);
+  canvas.width=Math.max(1,Math.round(sourceWidth*scale));
+  canvas.height=Math.max(1,Math.round(sourceHeight*scale));
+  preview=document.createElement('canvas');
+  preview.width=canvas.width;
+  preview.height=canvas.height;
+  const context=preview.getContext('2d');
+  context.fillStyle='#fff';
+  context.fillRect(0,0,preview.width,preview.height);
+  context.drawImage(source,0,0,preview.width,preview.height);
+
+  autoSummary='';
+  const saved=sessions[type];
+  if(saved?.frame===frame){
+   ({regions,stats,results,sequence,mode}=saved);
+   polarity.value=saved.polarity;
+   if(type==='current')refreshMeasurements();
+  }else{
    regions={band:null,background:null,scope:null};
    stats={band:null,background:null};
    results=[];
    sequence=0;
-   autoSummary='';
    polarity.value='dark';
-   setMode('band');
+   mode='band';
+   if(type==='current'&&saved?.results.length)autoSummary='左图已更换或裁切，请在新图上重新框选。';
   }
-  byId('wbSource').textContent=`${label} · 左图原图 · ${sourceWidth} × ${sourceHeight} px`;
+  setMode(mode);
+  const sourceName=type==='current'?'当前左图':'导入原图';
+  byId('wbSource').textContent=`${images.name} · ${sourceName} · ${sourceWidth} × ${sourceHeight} px`;
   updateRows();
   paint();
+ }
+
+ imageSource.onchange=()=>selectSource(imageSource.value);
+
+ function open(nextImages){
+  if(dialog.open)return;
+  images=nextImages;
+  selectSource('current');
   dialog.showModal();
  }
 

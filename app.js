@@ -315,6 +315,7 @@ function replaceImage(index,source,label,crop,cropSource=source){
  side.ctx.fillRect(0,0,side.canvas.width,side.canvas.height);
  side.ctx.drawImage(image,0,0,side.canvas.width,side.canvas.height);
  side.original=side.ctx.getImageData(0,0,side.canvas.width,side.canvas.height);
+ side.measureFrame=(side.measureFrame??0)+1;
  side.source=source;
  side.cropSource=crop?cropSource:null;
  side.label=label;
@@ -368,7 +369,16 @@ $('cropRight').onclick=()=>openCrop(1);
 $('measureWB').onclick=()=>{
  if(drawing||loading||exporting||view.drag)return;
  const left=sides[0];
- WBMeasure.open(left.source,left.label||left.name);
+ let current=left.canvas;
+ if(comparing){
+  // The visible comparison image can differ from the edited left image.
+  const editedPixels=beforeCompare[0];
+  current=document.createElement('canvas');
+  current.width=editedPixels.width;
+  current.height=editedPixels.height;
+  current.getContext('2d').putImageData(editedPixels,0,0);
+ }
+ WBMeasure.open({current,original:left.source,frame:left.measureFrame??0,name:left.label||left.name});
 };
 $('importTop').textContent='＋ 导入左图';$('importTop').onclick=$('importLeft').onclick=()=>$('file').click();$('importRight').onclick=()=>$('fileRight').click();
 ['file','fileRight'].forEach((id,index)=>{$(id).onchange=e=>{load(e.target.files[0],index);e.target.value='';};});

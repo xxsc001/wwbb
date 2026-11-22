@@ -113,14 +113,16 @@
     <button id="wbBand" type="button" aria-pressed="true">框选条带</button>
     <button id="wbBackground" type="button" aria-pressed="false">框选背景</button>
     <button id="wbScope" type="button" aria-pressed="false">限定范围</button>
+    <label>测量来源 <select id="wbImageSource"><option value="current">当前左图</option><option value="original">导入原图</option></select></label>
     <label>条带类型 <select id="wbPolarity"><option value="dark">浅底深条带</option><option value="bright">深底亮条带</option></select></label>
   </div>
   <div class="wb-tools">
     <button id="wbAuto" class="primary" type="button">自动框选</button>
     <label>最多识别 <select id="wbCount"><option value="6">6 条</option><option value="5">5 条</option></select></label>
     <button id="wbClearScope" type="button" disabled>清除范围</button>
+    <button id="wbClearAuto" type="button" disabled>清除自动框选</button>
   </div>
-  <canvas id="wbCanvas" aria-label="左图原图，拖动框选测量区域"></canvas>
+  <canvas id="wbCanvas" aria-label="测量图像，拖动框选测量区域"></canvas>
   <p id="wbStatus" class="wb-status" role="status"></p>
   <div class="wb-actions">
     <div class="wb-tools" role="group" aria-label="移动当前背景框">
@@ -141,8 +143,8 @@
       <tbody id="wbRows"></tbody>
     </table>
   </div>
-  <p class="wb-note">蓝框是条带，绿框是背景，橙框是识别范围。手动框选条带后会自动放置背景框，可用箭头移动，方向键每次移动 1 px，按住 Shift 移动 10 px。读数基于左图原图的 8 位灰度。</p>
+  <p class="wb-note">蓝框是条带，绿框是背景，橙框是识别范围。方向键每次移动背景框 1 px，按住 Shift 移动 10 px。测量按所选图像的 8 位灰度计算，定量比较时可切换到导入原图。</p>
 </dialog>
 <input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
 <input type="file" id="fileRight" accept="image/png,image/jpeg,image/webp" hidden>
-<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="wb-auto.js?v=lane-valleys"></script><script src="wb.js?v=movable-background"></script><script src="app.js?v=wb-intden"></script></body></html>
+<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="wb-auto.js?v=lane-valleys"></script><script src="wb.js?v=sync-edited"></script><script src="app.js?v=wb-sync"></script></body></html>
