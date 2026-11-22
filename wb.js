@@ -106,7 +106,8 @@ const WBMeasure = (() => {
   body.replaceChildren();
   for(const entry of results){
    const row=document.createElement('tr');
-   for(const text of [entry.automatic?entry.id+' 自动':entry.id,format(entry.band.area),format(entry.band.mean),format(entry.band.sum),format(entry.background?.mean??null),format(entry.corrected)]){
+   const id=entry.bandRegion.inferred?entry.id+' 待复核':entry.automatic?entry.id+' 自动':entry.id;
+   for(const text of [id,format(entry.band.area),format(entry.band.mean),format(entry.band.sum),format(entry.background?.mean??null),format(entry.corrected)]){
     const cell=document.createElement('td');
     cell.textContent=text;
     row.append(cell);
@@ -201,7 +202,11 @@ const WBMeasure = (() => {
   paint();
  };
 
- function detectInRange(range,type,limit){
+ function detectInRange(search,type,limit,scoped){
+  const margin=scoped?Math.max(4,Math.ceil(search.height*.55)):0;
+  const y=Math.max(0,search.y-margin);
+  const bottom=Math.min(sourceHeight,search.y+search.height+margin);
+  const range={...search,y,height:bottom-y};
   const scale=Math.min(1,800/range.width,420/range.height);
   const sample=document.createElement('canvas');
   const width=sample.width=Math.max(1,Math.round(range.width*scale));
@@ -213,8 +218,12 @@ const WBMeasure = (() => {
   const pixels=context.getImageData(0,0,width,height).data;
   const gray=new Uint8Array(width*height);
   for(let i=0;i<gray.length;i++)gray[i]=Math.round((299*pixels[4*i]+587*pixels[4*i+1]+114*pixels[4*i+2])/1000);
-  const bands=WBAuto.detect(gray,width,height,type,limit);
-  return WBAuto.originalBoxes(bands,range,width,height,sourceWidth,sourceHeight);
+  const window=scoped?{
+   top:Math.max(0,Math.floor((search.y-range.y)*height/range.height)),
+   bottom:Math.min(height,Math.ceil((search.y+search.height-range.y)*height/range.height))
+  }:null;
+  const bands=WBAuto.detect(gray,width,height,type,limit,window);
+  return WBAuto.originalBoxes(bands,range,width,height,sourceWidth,sourceHeight,scoped);
  }
 
  function cleanBackground(region,type){
@@ -262,7 +271,7 @@ const WBMeasure = (() => {
   const range=regions.scope||{x:0,y:0,width:sourceWidth,height:sourceHeight};
   const type=polarity.value;
   const limit=Number(byId('wbCount').value)||6;
-  const boxes=detectInRange(range,type,limit);
+  const boxes=detectInRange(range,type,limit,Boolean(regions.scope));
   if(!boxes.length||(!regions.scope&&boxes.length<2)){
    autoSummary='未识别到明显的一排条带。可限定目标范围、检查条带类型，或手动框选。';
    updateStatus();
@@ -279,7 +288,9 @@ const WBMeasure = (() => {
   });
   results=[...results.filter(entry=>!entry.automatic),...automatic];
   const corrected=automatic.filter(entry=>entry.background).length;
+  const inferred=boxes.filter(box=>box.inferred).length;
   autoSummary=`自动框选 ${boxes.length} 条，已为 ${corrected} 条校正背景。请核对蓝框和绿框。`;
+  if(inferred)autoSummary+=` ${inferred} 个相邻框按条带宽度和泳道间距拆分，已标为待复核。`;
   if(boxes.length<limit)autoSummary+=' 部分条带可能未识别，可用手动框选补测。';
   if(corrected<boxes.length)autoSummary+=' 未选到合适背景的条带仅显示原始 IntDen。';
   updateStatus();
@@ -291,7 +302,8 @@ const WBMeasure = (() => {
   const geometry=region=>region?[region.x,region.y,region.width,region.height]:['','','',''];
   const rows=[['ID','Area_px2','Mean_gray','RawIntDen','Background_mean_gray','Corrected_IntDen','Band_type','Band_x_px','Band_y_px','Band_width_px','Band_height_px','Background_x_px','Background_y_px','Background_width_px','Background_height_px','Background2_x_px','Background2_y_px','Background2_width_px','Background2_height_px','Method']];
   for(const entry of results){
-   rows.push([entry.id,entry.band.area,entry.band.mean,entry.band.sum,entry.background?.mean??'',entry.corrected??'',entry.type,...geometry(entry.bandRegion),...geometry(entry.backgroundRegion),...geometry(entry.backgroundRegions?.[1]),entry.automatic?'automatic':'manual']);
+   const method=entry.bandRegion.inferred?'automatic_split_review':entry.automatic?'automatic':'manual';
+   rows.push([entry.id,entry.band.area,entry.band.mean,entry.band.sum,entry.background?.mean??'',entry.corrected??'',entry.type,...geometry(entry.bandRegion),...geometry(entry.backgroundRegion),...geometry(entry.backgroundRegions?.[1]),method]);
   }
   const csv=rows.map(row=>row.join(',')).join('\r\n')+'\r\n';
   ImageExport.download(new Blob([csv],{type:'text/csv;charset=utf-8'}),'wb-intden.csv');
