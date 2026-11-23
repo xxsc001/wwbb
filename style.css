@@ -119,6 +119,9 @@ main{max-width:1480px}.image-pair{display:grid;grid-template-columns:1fr 1fr;gap
 .band-marker {position: absolute; border: 1px solid #214d7d; border-radius: 3px;}
 .band-marker[aria-current="true"] {border: 2px solid #14b8a6; box-shadow: 0 0 0 1px #073850;}
 .band-marker span {position: absolute; top: 0; left: 0; padding: 3px 4px; background: #153c68; color: white; font-size: 10px; line-height: 1;}
+.band-search-box {position: absolute; border: 2px dashed #d87912; border-radius: 3px; pointer-events: none;}
+#limitEditBands[aria-pressed="true"] {background: #fff0dd; border-color: #dfaa65; color: #7e4105;}
+#dropzone[data-band-selecting="true"] canvas {cursor: crosshair;}
 .crop-fields {display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0 10px;}
 .crop-fields label {flex: 1 1 130px; font-size: 14px;}
 .crop-fields input[type=number] {display: block; width: 100%; padding: 8px; margin-top: 5px; border: 1px solid var(--line); border-radius: 6px; font: inherit; color: inherit;}

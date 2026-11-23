@@ -131,7 +131,7 @@ const WBAuto=(()=>{
    for(let x=valley+1;x<=b.x-inside;x++){
     if(profile[x]<profile[valley]||(profile[x]===profile[valley]&&Math.abs(x-middle)<Math.abs(valley-middle)))valley=x;
    }
-   if(profile[valley]<=weaker*.48&&weaker-profile[valley]>=8){
+   if(profile[valley]<=weaker*.54&&weaker-profile[valley]>=8){
     const left=cuts.at(-1)??run.left;
     if(valley-left>=separation*.68&&run.right-valley>=separation*.68)cuts.push(valley);
    }
@@ -140,7 +140,68 @@ const WBAuto=(()=>{
   return edges.slice(1).map((right,i)=>({left:edges[i],right}));
  }
 
- function scopedRow(signal,width,window,limit){
+ function guidedValleys(profile,runs,expected,floor){
+  if(!expected||runs.length>=expected)return runs;
+  const start=runs[0].left,end=runs.at(-1).right;
+  const pitch=(end-start)/expected;
+  if(pitch<8)return runs;
+  const available=expected-runs.length;
+  const possible=[];
+  for(let lane=1;lane<expected;lane++){
+   const boundary=start+lane*pitch;
+   const runIndex=runs.findIndex(run=>boundary-run.left>pitch*.27&&run.right-boundary>pitch*.27);
+   if(runIndex<0)continue;
+   const run=runs[runIndex];
+   let valley=-1,score=Infinity;
+   const low=Math.max(Math.ceil(boundary-pitch*.22),run.left+Math.ceil(pitch*.29));
+   const high=Math.min(Math.floor(boundary+pitch*.22),run.right-Math.ceil(pitch*.29));
+   for(let x=low;x<=high;x++){
+    const weighted=profile[x]+Math.abs(x-boundary)/pitch*floor*2;
+    if(weighted<score){valley=x;score=weighted;}
+   }
+   if(valley<0)continue;
+   let before=0,after=0;
+   const flank=Math.ceil(pitch*.50);
+   for(let x=Math.max(run.left,valley-flank);x<valley;x++)before=Math.max(before,profile[x]);
+   for(let x=valley+1;x<Math.min(run.right,valley+flank+1);x++)after=Math.max(after,profile[x]);
+   const weaker=Math.min(before,after);
+   if(weaker>=floor*1.5&&profile[valley]<=weaker*.82&&weaker-profile[valley]>=7){
+    possible.push({valley,runIndex,depth:(weaker-profile[valley])/weaker});
+   }
+  }
+  const cuts=possible.sort((a,b)=>b.depth-a.depth).slice(0,available);
+  return runs.flatMap((run,i)=>{
+   const edges=cuts.filter(cut=>cut.runIndex===i).map(cut=>cut.valley).sort((a,b)=>a-b);
+   if(!edges.length)return [run];
+   edges.unshift(run.left);
+   edges.push(run.right);
+   return edges.slice(1).map((right,index)=>({left:edges[index],right,inferred:true}));
+  });
+ }
+
+ function resolveBrushRuns(profile,runs,expected,floor){
+  if(expected!=='auto')return guidedValleys(profile,runs,expected,floor);
+  if(runs.length>=5)return runs;
+  let best=runs,bestScore=.27;
+  for(const count of [5,6]){
+   const candidate=guidedValleys(profile,runs,count,floor);
+   if(candidate.length!==count)continue;
+   const centers=candidate.map(run=>(run.left+run.right)/2);
+   const gaps=centers.slice(1).map((x,i)=>x-centers[i]);
+   const pitch=median(gaps);
+   const averageError=gaps.reduce((sum,gap)=>sum+Math.abs(gap-pitch)/pitch,0)/gaps.length;
+   const widths=candidate.map(run=>run.right-run.left);
+   const unevenWidths=Math.min(...widths)<Math.max(...widths)*.45;
+   const score=averageError+(unevenWidths ? .24 : 0);
+   if(score<bestScore){
+    best=candidate;
+    bestScore=score;
+   }
+  }
+  return best;
+ }
+
+ function scopedRow(signal,width,window,limit,expected){
   // Work from a horizontal signal profile so a connected blob can span multiple lanes.
   const rowTotals=new Float32Array(window.bottom-window.top);
   let peakY=window.top;
@@ -180,7 +241,7 @@ const WBAuto=(()=>{
   }
   if(!connected.length)return [];
   const separation=Math.max(6,Math.round(width*.055));
-  const runs=connected.flatMap(run=>splitAtValleys(profile,run,separation,floor));
+  const runs=resolveBrushRuns(profile,connected.flatMap(run=>splitAtValleys(profile,run,separation,floor)),expected,floor);
 
   const sizes=runs.map(run=>run.right-run.left).sort((a,b)=>a-b);
   const typical=median(sizes.slice(0,Math.max(1,Math.ceil(sizes.length*.75))));
@@ -215,17 +276,17 @@ const WBAuto=(()=>{
     }
     let strength=0;
     for(let x=left;x<right;x++)strength+=profile[x];
-    pieces.push({x:(left+right)/2,y:(top+bottom)/2,width:right-left,height:bottom-top,score:strength,inferred:count>1});
+    pieces.push({x:(left+right)/2,y:(top+bottom)/2,width:right-left,height:bottom-top,score:strength,inferred:count>1||!!run.inferred});
     left=right;
    }
   }
   return pieces.sort((a,b)=>b.score-a.score).slice(0,limit).sort((a,b)=>a.x-b.x);
  }
 
- function detect(gray,width,height,type,limit,window=null){
+ function detect(gray,width,height,type,limit,window=null,expected=null){
   if(width<18||height<8)return [];
   const response=localContrast(gray,width,height,type,window);
-  if(window)return scopedRow(response,width,window,limit);
+  if(window)return scopedRow(response,width,window,limit,expected);
   return strongestRow(components(response,width,height),height,limit);
  }
 
@@ -254,7 +315,7 @@ const WBAuto=(()=>{
   };});
  }
 
- function detectImage(image,type='dark',limit=6,scope=null){
+ function detectImage(image,type='dark',limit=6,scope=null,expected=null){
   const imageWidth=image.naturalWidth||image.width;
   const imageHeight=image.naturalHeight||image.height;
   const search=scope||{x:0,y:0,width:imageWidth,height:imageHeight};
@@ -279,7 +340,7 @@ const WBAuto=(()=>{
    top:Math.max(0,Math.floor((search.y-range.y)*height/range.height)),
    bottom:Math.min(height,Math.ceil((search.y+search.height-range.y)*height/range.height))
   }:null;
-  const bands=detect(gray,width,height,type,limit,window);
+  const bands=detect(gray,width,height,type,limit,window,expected);
   return originalBoxes(bands,range,width,height,imageWidth,imageHeight,Boolean(scope));
  }
 

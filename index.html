@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="本地运行的双图编辑工作台，支持双图同步处理和 300 DPI 打包导出。"><title>Band Studio · 条带工作台</title><link rel="stylesheet" href="style.css?v=band-width"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="本地运行的双图编辑工作台，支持双图同步处理和 300 DPI 打包导出。"><title>Band Studio · 条带工作台</title><link rel="stylesheet" href="style.css?v=brush-scope"></head>
 <body>
 <header class="topbar"><a class="brand" href="./"><span class="brand-icon">▤</span><span>Band Studio<small>条带图像工作台</small></span></a><span class="local">本地处理 · 图片无需上传</span><button class="primary" id="importTop">＋ 导入图片</button></header>
 <main><div class="intro"><div><span class="eyebrow">DUAL IMAGE WORKSPACE</span><h1>一次编辑，双图同步。</h1><p>左右分别导入图片，在左图操作，右图实时同步处理。</p></div><span class="tag">双图联动 · 本地处理</span></div>
@@ -32,6 +32,9 @@
   <summary>按条带调宽窄</summary>
   <div class="band-controls">
     <button id="detectEditBands" type="button">识别当前视野</button>
+    <button id="limitEditBands" type="button" aria-pressed="false">限定范围</button>
+    <button id="clearEditBandRange" type="button" disabled>清除范围</button>
+    <label>预期条带数 <select id="expectedEditBands"><option value="">自动</option><option value="5">5 条</option><option value="6">6 条</option></select></label>
     <label>目标条带 <select id="editBandNumber" disabled><option value="">请先识别</option></select></label>
     <label>操作 <select id="editBandMode"><option value="narrow">收窄（背景收边）</option><option value="thicken">加厚（向上下延展）</option></select></label>
     <label>每侧像素 <input id="editBandPixels" type="number" min="1" max="24" step="1" value="3"></label>
@@ -160,4 +163,4 @@
 </dialog>
 <input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
 <input type="file" id="fileRight" accept="image/png,image/jpeg,image/webp" hidden>
-<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="wb-auto.js?v=band-width"></script><script src="wb.js?v=shared-detector"></script><script src="band-width.js"></script><script src="app.js?v=band-width"></script></body></html>
+<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="wb-auto.js?v=brush-scope"></script><script src="wb.js?v=shared-detector"></script><script src="band-width.js"></script><script src="app.js?v=brush-scope"></script></body></html>
