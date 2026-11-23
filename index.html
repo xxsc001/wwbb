@@ -32,6 +32,7 @@
   <summary>按条带调宽窄</summary>
   <div class="band-controls">
     <button id="detectEditBands" type="button">识别当前视野</button>
+    <button id="clearEditBandView" type="button" title="移除当前识别的条带框和编号" disabled>去除当前视野</button>
     <button id="limitEditBands" type="button" aria-pressed="false">限定范围</button>
     <button id="clearEditBandRange" type="button" disabled>清除范围</button>
     <label>预期条带数 <select id="expectedEditBands"><option value="">自动</option><option value="5">5 条</option><option value="6">6 条</option></select></label>
@@ -163,4 +164,4 @@
 </dialog>
 <input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
 <input type="file" id="fileRight" accept="image/png,image/jpeg,image/webp" hidden>
-<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="wb-auto.js?v=brush-scope"></script><script src="wb.js?v=shared-detector"></script><script src="band-width.js"></script><script src="app.js?v=brush-scope"></script></body></html>
+<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="wb-auto.js?v=brush-scope"></script><script src="wb.js?v=shared-detector"></script><script src="band-width.js"></script><script src="app.js?v=clear-band-view"></script></body></html>

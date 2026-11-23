@@ -150,6 +150,7 @@ function refreshBandEditor(){
  const pixels=$('editBandPixels'),strength=$('editBandStrength');
  $('detectEditBands').disabled=blocked||bandSearch.selecting;
  $('detectEditBands').textContent=bandSearch.box?'重新识别范围':'识别当前视野';
+ $('clearEditBandView').disabled=blocked||bandSearch.selecting||!editableBands.length;
  $('limitEditBands').disabled=blocked;
  $('limitEditBands').setAttribute('aria-pressed',String(bandSearch.selecting));
  $('clearEditBandRange').disabled=!bandSearch.box||!!bandSearch.drag||blocked;
@@ -265,6 +266,11 @@ function selectBandRange(active){
 }
 
 $('detectEditBands').onclick=detectEditableBands;
+$('clearEditBandView').onclick=()=>{
+ if($('clearEditBandView').disabled)return;
+ setEditableBands([]);
+ bandEditorMessage('当前识别的条带框和编号已清除。');
+};
 $('limitEditBands').onclick=()=>{
  if(bandSearch.drag||view.drag)return;
  selectBandRange(!bandSearch.selecting);
