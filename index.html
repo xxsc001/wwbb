@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="本地运行的双图编辑工作台，支持双图同步处理和 300 DPI 打包导出。"><title>Band Studio · 条带工作台</title><link rel="stylesheet" href="style.css?v=wb-intden"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="本地运行的双图编辑工作台，支持双图同步处理和 300 DPI 打包导出。"><title>Band Studio · 条带工作台</title><link rel="stylesheet" href="style.css?v=band-width"></head>
 <body>
 <header class="topbar"><a class="brand" href="./"><span class="brand-icon">▤</span><span>Band Studio<small>条带图像工作台</small></span></a><span class="local">本地处理 · 图片无需上传</span><button class="primary" id="importTop">＋ 导入图片</button></header>
 <main><div class="intro"><div><span class="eyebrow">DUAL IMAGE WORKSPACE</span><h1>一次编辑，双图同步。</h1><p>左右分别导入图片，在左图操作，右图实时同步处理。</p></div><span class="tag">双图联动 · 本地处理</span></div>
@@ -16,7 +16,7 @@
   <button id="focusBands" type="button">定位并放大条带</button>
   <button id="resetView" type="button">重置视野</button>
 </div>
-<div class="image-pair"><div class="image-panel"><div class="panel-title"><span><b>左图</b> 操作区域</span><button id="importLeft">＋ 导入左图</button></div><div class="canvas-wrap" id="dropzone"><canvas id="canvas" width="1200" height="780" aria-label="左图操作画布，支持编辑和联动缩放移动"></canvas><div id="cursor" hidden></div><div class="drop-hint">松开以导入左图</div><span class="image-label" id="imageLabel">DEMO / 模拟条带</span></div></div><div class="image-panel"><div class="panel-title"><span><b>右图</b> 同步结果</span><button id="importRight">＋ 导入右图</button></div><div class="canvas-wrap" id="dropzoneRight"><canvas id="canvasRight" width="1200" height="780" aria-label="右图同步结果，只读预览"></canvas><div id="cursorRight" class="sync-cursor" hidden></div><div class="drop-hint">松开以导入右图</div><span class="image-label" id="imageLabelRight">DEMO / 同步预览</span></div><div id="rightInfo" class="right-info">模拟条带-右图.png · 1200 × 780 px</div></div></div>
+<div class="image-pair"><div class="image-panel"><div class="panel-title"><span><b>左图</b> 操作区域</span><button id="importLeft">＋ 导入左图</button></div><div class="canvas-wrap" id="dropzone"><canvas id="canvas" width="1200" height="780" aria-label="左图操作画布，支持编辑和联动缩放移动"></canvas><div id="bandMarkersLeft" class="band-markers" aria-hidden="true" hidden></div><div id="cursor" hidden></div><div class="drop-hint">松开以导入左图</div><span class="image-label" id="imageLabel">DEMO / 模拟条带</span></div></div><div class="image-panel"><div class="panel-title"><span><b>右图</b> 同步结果</span><button id="importRight">＋ 导入右图</button></div><div class="canvas-wrap" id="dropzoneRight"><canvas id="canvasRight" width="1200" height="780" aria-label="右图同步结果，只读预览"></canvas><div id="bandMarkersRight" class="band-markers" aria-hidden="true" hidden></div><div id="cursorRight" class="sync-cursor" hidden></div><div class="drop-hint">松开以导入右图</div><span class="image-label" id="imageLabelRight">DEMO / 同步预览</span></div><div id="rightInfo" class="right-info">模拟条带-右图.png · 1200 × 780 px</div></div></div>
 <div class="image-info"><div class="image-info-tools"><span id="fileInfo">模拟条带.png <i>·</i> 1200 × 780 px</span><button id="measureWB" type="button">测左图 WB IntDen</button></div><span id="modeInfo">揉边笔刷 <i>·</i> 拖动以编辑</span></div>
 <section class="crop-toolbar" aria-label="截图模板">
   <div><h3>截图模板</h3><p id="templateStatus">从一张图片设定固定宽高，供后续图片使用。</p></div>
@@ -28,6 +28,19 @@
 </section>
 <div class="controls"><div class="tool-row"><div class="tools" role="group" aria-label="笔刷工具"><button class="tool active" data-tool="smudge" aria-pressed="true"><span>◌</span> 揉边</button><button class="tool" data-tool="smooth" aria-pressed="false"><span>≈</span> 平滑</button><button class="tool" data-tool="darken" aria-pressed="false"><span>◕</span> 加深</button><button class="tool" data-tool="lighten" title="参考邻近亮度，只提亮偏暗处" aria-pressed="false"><span>◔</span> 减淡</button></div><span class="tool-description" id="toolDescription">沿笔触柔和推移边缘</span></div>
 <div class="sliders"><label for="radius"><span>画笔半径 <output id="radiusValue">10 <small>px</small></output></span><input id="radius" type="range" min="2" max="50" value="10"></label><label for="strength"><span>深浅力度 <output id="strengthValue">45 <small>%</small></output></span><input id="strength" type="range" min="1" max="100" value="45"></label></div>
+<details id="bandEditor" class="band-editor">
+  <summary>按条带调宽窄</summary>
+  <div class="band-controls">
+    <button id="detectEditBands" type="button">识别当前视野</button>
+    <label>目标条带 <select id="editBandNumber" disabled><option value="">请先识别</option></select></label>
+    <label>操作 <select id="editBandMode"><option value="narrow">收窄（背景收边）</option><option value="thicken">加厚（向上下延展）</option></select></label>
+    <label>每侧像素 <input id="editBandPixels" type="number" min="1" max="24" step="1" value="3"></label>
+    <label>力度（%） <input id="editBandStrength" type="number" min="1" max="100" step="1" value="65"></label>
+    <label class="band-sync"><input id="editBandSync" type="checkbox" checked> 同步右图</label>
+    <button id="applyBandWidth" class="primary" type="button" disabled>应用到所选条带</button>
+  </div>
+  <p id="bandEditStatus" role="status">识别后按从左到右选择。收窄会用背景柔化上下边缘，保留条带中心。</p>
+</details>
 <div class="control-footer"><span><kbd>Ctrl</kbd> + <kbd>Z</kbd> 撤销上一步 <span class="divider">|</span> 支持拖入 PNG、JPG、WebP</span><button id="reset" class="text-button">恢复原图</button></div></div>
 <section class="export-panel" aria-labelledby="exportHeading">
   <div class="export-heading"><h3 id="exportHeading">导出设置</h3><span>300 DPI</span></div>
@@ -147,4 +160,4 @@
 </dialog>
 <input type="file" id="file" accept="image/png,image/jpeg,image/webp" hidden>
 <input type="file" id="fileRight" accept="image/png,image/jpeg,image/webp" hidden>
-<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="wb-auto.js?v=lane-valleys"></script><script src="wb.js?v=sync-edited"></script><script src="app.js?v=wb-sync"></script></body></html>
+<script src="export.js"></script><script src="crop.js?v=processed-crop"></script><script src="wb-auto.js?v=band-width"></script><script src="wb.js?v=shared-detector"></script><script src="band-width.js"></script><script src="app.js?v=band-width"></script></body></html>

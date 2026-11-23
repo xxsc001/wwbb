@@ -254,5 +254,34 @@ const WBAuto=(()=>{
   };});
  }
 
- return {detect,originalBoxes};
+ function detectImage(image,type='dark',limit=6,scope=null){
+  const imageWidth=image.naturalWidth||image.width;
+  const imageHeight=image.naturalHeight||image.height;
+  const search=scope||{x:0,y:0,width:imageWidth,height:imageHeight};
+  const margin=scope?Math.max(4,Math.ceil(search.height*.55),Math.ceil(search.width*.075)):0;
+  const y=Math.max(0,search.y-margin);
+  const bottom=Math.min(imageHeight,search.y+search.height+margin);
+  const range={...search,y,height:bottom-y};
+  const scale=Math.min(1,800/range.width,420/range.height);
+  const sample=document.createElement('canvas');
+  const width=sample.width=Math.max(1,Math.round(range.width*scale));
+  const height=sample.height=Math.max(1,Math.round(range.height*scale));
+  const context=sample.getContext('2d',{willReadFrequently:true});
+  context.fillStyle='#fff';
+  context.fillRect(0,0,width,height);
+  context.drawImage(image,range.x,range.y,range.width,range.height,0,0,width,height);
+  const pixels=context.getImageData(0,0,width,height).data;
+  const gray=new Uint8Array(width*height);
+  for(let i=0;i<gray.length;i++){
+   gray[i]=Math.round((299*pixels[4*i]+587*pixels[4*i+1]+114*pixels[4*i+2])/1000);
+  }
+  const window=scope?{
+   top:Math.max(0,Math.floor((search.y-range.y)*height/range.height)),
+   bottom:Math.min(height,Math.ceil((search.y+search.height-range.y)*height/range.height))
+  }:null;
+  const bands=detect(gray,width,height,type,limit,window);
+  return originalBoxes(bands,range,width,height,imageWidth,imageHeight,Boolean(scope));
+ }
+
+ return {detect,originalBoxes,detectImage};
 })();

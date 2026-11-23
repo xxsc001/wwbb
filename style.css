@@ -107,6 +107,18 @@ main{max-width:1480px}.image-pair{display:grid;grid-template-columns:1fr 1fr;gap
 .wb-table th, .wb-table td {text-align: left; white-space: nowrap; border-bottom: 1px solid var(--line); padding: 8px;}
 .wb-table th {background: #f7faff;}
 .wb-table td button {padding: 4px 8px;}
+.band-editor {margin-top: 18px; padding-top: 13px; border-top: 1px solid var(--line);}
+.band-editor summary {cursor: pointer; color: #15538d; font-size: 15px; font-weight: 650;}
+.band-controls {display: flex; align-items: end; flex-wrap: wrap; gap: 9px; margin: 12px 0 8px;}
+.band-controls label {display: flex; flex-direction: column; gap: 4px; font-size: 13px;}
+.band-controls select, .band-controls input[type=number] {padding: 7px; border: 1px solid var(--line); border-radius: 6px; color: inherit; background: white; font: inherit;}
+.band-controls input[type=number] {width: 75px;}
+.band-controls .band-sync {flex-direction: row; align-items: center; min-height: 37px;}
+#bandEditStatus {color: #526f8e; line-height: 1.55;}
+.band-markers {position: absolute; inset: 0; pointer-events: none; transform-origin: top left;}
+.band-marker {position: absolute; border: 1px solid #214d7d; border-radius: 3px;}
+.band-marker[aria-current="true"] {border: 2px solid #14b8a6; box-shadow: 0 0 0 1px #073850;}
+.band-marker span {position: absolute; top: 0; left: 0; padding: 3px 4px; background: #153c68; color: white; font-size: 10px; line-height: 1;}
 .crop-fields {display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0 10px;}
 .crop-fields label {flex: 1 1 130px; font-size: 14px;}
 .crop-fields input[type=number] {display: block; width: 100%; padding: 8px; margin-top: 5px; border: 1px solid var(--line); border-radius: 6px; font: inherit; color: inherit;}

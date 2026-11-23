@@ -9,6 +9,8 @@ let tool='smudge',history=[],future=[],drawing=false,previous=null,comparing=fal
 let exporting = false;
 const leftViewport = $('dropzone');
 const view = {zoom: 1, x: 0, y: 0, mode: 'brush', drag: null};
+const bandMarkers=[$('bandMarkersLeft'),$('bandMarkersRight')];
+let editableBands=[];
 const snapshot=()=>sides.map(s=>s.ctx.getImageData(0,0,s.canvas.width,s.canvas.height));
 const restore=pair=>pair.forEach((image,i)=>sides[i].ctx.putImageData(image,0,0));
 function status(message){$('status').textContent=message;}
@@ -17,6 +19,7 @@ function refresh(){
  $('redo').disabled=!future.length||comparing||loading||exporting;
  $('reset').disabled=comparing||loading||exporting;
  updateExport();
+ refreshBandEditor();
 }
 function remember(){history.push(snapshot());const bytes=sides.reduce((sum,s)=>sum+s.canvas.width*s.canvas.height*4,0);const limit=Math.max(2,Math.min(20,Math.floor(100000000/bytes)));if(history.length>limit)history.shift();future=[];refresh();}
 function demo(s,variant){
@@ -65,6 +68,7 @@ function renderView(){
  view.y=Math.max(minOffset,Math.min(0,view.y));
  const transform=`translate(${view.x*100}%, ${view.y*100}%) scale(${view.zoom})`;
  for(const side of sides)side.canvas.style.transform=transform;
+ for(const markers of bandMarkers)markers.style.transform=transform;
  const percent=Math.round(view.zoom*100);
  $('zoom').value=percent;
  $('zoomValue').textContent=percent+'%';
@@ -136,6 +140,114 @@ function movePan(e){
  view.y=drag.y+(e.clientY-drag.screenY)/leftViewport.clientHeight;
  renderView();
 }
+
+function bandEditorMessage(message){$('bandEditStatus').textContent=message;}
+
+function refreshBandEditor(){
+ const blocked=drawing||loading||exporting||comparing;
+ const selected=$('editBandNumber').value;
+ const pixels=$('editBandPixels'),strength=$('editBandStrength');
+ $('detectEditBands').disabled=blocked;
+ $('editBandNumber').disabled=!editableBands.length;
+ $('applyBandWidth').disabled=blocked||selected===''||!editableBands[Number(selected)]||
+  !pixels.value||!pixels.validity.valid||!strength.value||!strength.validity.valid;
+ const visible=$('bandEditor').open&&editableBands.length>0&&!comparing;
+ bandMarkers[0].hidden=!visible;
+ bandMarkers[1].hidden=!visible||!$('editBandSync').checked;
+}
+
+function showBandMarkers(){
+ const selected=Number($('editBandNumber').value);
+ for(const overlay of bandMarkers){
+  overlay.replaceChildren();
+  editableBands.forEach((band,i)=>{
+   const marker=document.createElement('div');
+   marker.className='band-marker';
+   marker.setAttribute('aria-current',String(i===selected));
+   marker.style.left=100*band.x/canvas.width+'%';
+   marker.style.top=100*band.y/canvas.height+'%';
+   marker.style.width=100*band.width/canvas.width+'%';
+   marker.style.height=100*band.height/canvas.height+'%';
+   const label=document.createElement('span');
+   label.textContent=String(i+1);
+   marker.append(label);
+   overlay.append(marker);
+  });
+ }
+ refreshBandEditor();
+}
+
+function setEditableBands(bands){
+ editableBands=bands;
+ const picker=$('editBandNumber');
+ picker.replaceChildren();
+ const placeholder=document.createElement('option');
+ placeholder.value='';
+ placeholder.textContent=bands.length?'请选择条带':'请先识别';
+ picker.append(placeholder);
+ bands.forEach((box,i)=>{
+  const option=document.createElement('option');
+  option.value=String(i);
+  option.textContent=`条带 ${i+1}${box.inferred?'（待复核）':''}`;
+  picker.append(option);
+ });
+ picker.value='';
+ showBandMarkers();
+}
+
+$('detectEditBands').onclick=()=>{
+ if($('detectEditBands').disabled||view.drag)return;
+ const x=Math.max(0,Math.floor(-view.x/view.zoom*canvas.width));
+ const y=Math.max(0,Math.floor(-view.y/view.zoom*canvas.height));
+ const scope={
+  x,y,
+  width:Math.max(1,Math.min(canvas.width-x,Math.ceil(canvas.width/view.zoom))),
+  height:Math.max(1,Math.min(canvas.height-y,Math.ceil(canvas.height/view.zoom)))
+ };
+ setEditableBands(WBAuto.detectImage(canvas,'dark',6,scope));
+ const count=editableBands.length;
+ bandEditorMessage(count
+  ? `识别到 ${count} 条。请选择编号，按需收窄或加厚。`
+  : '当前视野未找到明显的深色条带，可调整缩放和位置后再试。');
+};
+
+function scaleBandTo(band,target){
+ const sx=target.width/canvas.width,sy=target.height/canvas.height;
+ const x=Math.min(target.width-1,Math.round(band.x*sx));
+ const y=Math.min(target.height-1,Math.round(band.y*sy));
+ const right=Math.min(target.width,Math.round((band.x+band.width)*sx));
+ const bottom=Math.min(target.height,Math.round((band.y+band.height)*sy));
+ return {x,y,width:right-x,height:bottom-y};
+}
+
+$('applyBandWidth').onclick=()=>{
+ if($('applyBandWidth').disabled||view.drag)return;
+ const selected=Number($('editBandNumber').value);
+ const band=editableBands[selected];
+ const mode=$('editBandMode').value;
+ const pixels=Number($('editBandPixels').value);
+ const strength=Number($('editBandStrength').value)/100;
+ const leftPatch=BandWidth.prepare(sides[0],band,pixels,strength,mode);
+ if(!leftPatch){
+  bandEditorMessage('所选框内没有可调整的深色边缘。');
+  return;
+ }
+ const sync=$('editBandSync').checked;
+ const rightPatch=sync?BandWidth.prepare(sides[1],scaleBandTo(band,right),pixels*right.height/canvas.height,strength,mode):null;
+ remember();
+ sides[0].ctx.putImageData(leftPatch.image,leftPatch.x,leftPatch.y);
+ if(rightPatch)sides[1].ctx.putImageData(rightPatch.image,rightPatch.x,rightPatch.y);
+ edited=true;
+ const change=mode==='narrow'?'已收窄':'已加厚';
+ const syncNote=rightPatch?'，右图已同步':sync?'，右图对应位置未找到可调整的深色边缘':'';
+ bandEditorMessage(`条带 ${selected+1} ${change}${syncNote}。可用「撤销」恢复。`);
+ refresh();
+};
+
+$('editBandNumber').onchange=showBandMarkers;
+$('editBandSync').onchange=refreshBandEditor;
+for(const id of ['editBandPixels','editBandStrength'])$(id).addEventListener('input',refreshBandEditor);
+$('bandEditor').addEventListener('toggle',refreshBandEditor);
 
 function luminance(data,index){
  return .2126*data[index]+.7152*data[index+1]+.0722*data[index+2];
@@ -321,6 +433,10 @@ function replaceImage(index,source,label,crop,cropSource=source){
  side.label=label;
  side.name=label.replace(/\.[^.]+$/,'');
  side.crop=crop;
+ if(index===0&&editableBands.length){
+  setEditableBands([]);
+  bandEditorMessage('左图已更换，请重新识别条带。');
+ }
  history=[];future=[];edited=false;beforeCompare=null;
  $('compare').setAttribute('aria-pressed','false');
  $(index?'rightInfo':'fileInfo').textContent=label+' · '+side.canvas.width+' × '+side.canvas.height+' px';

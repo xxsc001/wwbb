@@ -251,30 +251,6 @@ const WBMeasure = (() => {
   paint();
  };
 
- function detectInRange(search,type,limit,scoped){
-  const margin=scoped?Math.max(4,Math.ceil(search.height*.55),Math.ceil(search.width*.075)):0;
-  const y=Math.max(0,search.y-margin);
-  const bottom=Math.min(sourceHeight,search.y+search.height+margin);
-  const range={...search,y,height:bottom-y};
-  const scale=Math.min(1,800/range.width,420/range.height);
-  const sample=document.createElement('canvas');
-  const width=sample.width=Math.max(1,Math.round(range.width*scale));
-  const height=sample.height=Math.max(1,Math.round(range.height*scale));
-  const context=sample.getContext('2d',{willReadFrequently:true});
-  context.fillStyle='#fff';
-  context.fillRect(0,0,width,height);
-  context.drawImage(source,range.x,range.y,range.width,range.height,0,0,width,height);
-  const pixels=context.getImageData(0,0,width,height).data;
-  const gray=new Uint8Array(width*height);
-  for(let i=0;i<gray.length;i++)gray[i]=Math.round((299*pixels[4*i]+587*pixels[4*i+1]+114*pixels[4*i+2])/1000);
-  const window=scoped?{
-   top:Math.max(0,Math.floor((search.y-range.y)*height/range.height)),
-   bottom:Math.min(height,Math.ceil((search.y+search.height-range.y)*height/range.height))
-  }:null;
-  const bands=WBAuto.detect(gray,width,height,type,limit,window);
-  return WBAuto.originalBoxes(bands,range,width,height,sourceWidth,sourceHeight,scoped);
- }
-
  function cleanBackground(region,type){
   const sample=measureRegion(source,region,true);
   const levels=sample.histogram;
@@ -317,10 +293,9 @@ const WBMeasure = (() => {
 
  byId('wbAuto').onclick=()=>{
   if(!source||drag)return;
-  const range=regions.scope||{x:0,y:0,width:sourceWidth,height:sourceHeight};
   const type=polarity.value;
   const limit=Number(byId('wbCount').value)||6;
-  const boxes=detectInRange(range,type,limit,Boolean(regions.scope));
+  const boxes=WBAuto.detectImage(source,type,limit,regions.scope);
   if(!boxes.length||(!regions.scope&&boxes.length<2)){
    autoSummary='未识别到明显的一排条带。可限定目标范围、检查条带类型，或手动框选。';
    updateStatus();
